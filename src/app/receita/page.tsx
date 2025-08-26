@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { Sidebar } from "@/components/sidebar";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -9,37 +10,27 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
+import { SelectContent } from "@/components/ui/select";
+import { SelectItem } from "@/components/ui/select";
+import { SelectTrigger } from "@/components/ui/select";
+import { SelectValue } from "@/components/ui/select";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Menu,
-  X,
-  Home,
-  TrendingUp,
-  TrendingDown,
-  DollarSign,
   BarChart3,
-  Settings,
+  DollarSign,
+  Edit,
   Plus,
   Search,
-  Edit,
   Trash2,
+  TrendingUp
 } from "lucide-react";
+import { ModalReceita } from "@/components/receitaModal";
+import { useState } from "react";
+import { Input } from "@/components/ui/input";
 
 export default function ReceitaPage() {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [filtroCategoria, setFiltroCategoria] = useState("todas");
   const [busca, setBusca] = useState("");
-
-  const toggleSidebar = () => setSidebarOpen(!sidebarOpen);
 
   // Dados mockados para demonstração
   const totalReceitas = 25750.0;
@@ -110,106 +101,7 @@ export default function ReceitaPage() {
   return (
     <div className="flex h-screen bg-background">
       {/* Sidebar - mesma estrutura da página principal */}
-      <div
-        className={`${
-          sidebarOpen ? "w-64" : "w-16"
-        } transition-all duration-300 bg-sidebar border-r border-sidebar-border flex flex-col`}
-      >
-        {/* Header da Sidebar */}
-        <div className="p-4 border-b border-sidebar-border">
-          <div className="flex items-center justify-between">
-            {sidebarOpen && (
-              <h2 className="text-lg font-semibold text-sidebar-foreground">
-                FluxoCaixa
-              </h2>
-            )}
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={toggleSidebar}
-              className="text-sidebar-foreground hover:bg-sidebar-accent"
-            >
-              {sidebarOpen ? (
-                <X className="h-4 w-4" />
-              ) : (
-                <Menu className="h-4 w-4" />
-              )}
-            </Button>
-          </div>
-        </div>
-
-        {/* Menu da Sidebar */}
-        <nav className="flex-1 p-2">
-          <div className="space-y-2">
-            <Button
-              variant="ghost"
-              className={`w-full ${
-                sidebarOpen ? "justify-start" : "justify-center"
-              } text-sidebar-foreground hover:bg-sidebar-accent`}
-            >
-              <Home className="h-4 w-4" />
-              {sidebarOpen && <span className="ml-2">Dashboard</span>}
-            </Button>
-            <Button
-              variant="default"
-              className={`w-full ${
-                sidebarOpen ? "justify-start" : "justify-center"
-              }`}
-            >
-              <TrendingUp className="h-4 w-4" />
-              {sidebarOpen && <span className="ml-2">Receitas</span>}
-            </Button>
-            <Button
-              variant="ghost"
-              className={`w-full ${
-                sidebarOpen ? "justify-start" : "justify-center"
-              } text-sidebar-foreground hover:bg-sidebar-accent`}
-            >
-              <TrendingDown className="h-4 w-4" />
-              {sidebarOpen && <span className="ml-2">Despesas</span>}
-            </Button>
-            <Button
-              variant="ghost"
-              className={`w-full ${
-                sidebarOpen ? "justify-start" : "justify-center"
-              } text-sidebar-foreground hover:bg-sidebar-accent`}
-            >
-              <BarChart3 className="h-4 w-4" />
-              {sidebarOpen && <span className="ml-2">Relatórios</span>}
-            </Button>
-            <Button
-              variant="ghost"
-              className={`w-full ${
-                sidebarOpen ? "justify-start" : "justify-center"
-              } text-sidebar-foreground hover:bg-sidebar-accent`}
-            >
-              <Settings className="h-4 w-4" />
-              {sidebarOpen && <span className="ml-2">Configurações</span>}
-            </Button>
-          </div>
-        </nav>
-
-        {/* Footer da Sidebar */}
-        <div className="p-4 border-t border-sidebar-border">
-          <div className="flex items-center space-x-2">
-            <Avatar className="h-8 w-8">
-              <AvatarFallback className="bg-primary text-primary-foreground">
-                U
-              </AvatarFallback>
-            </Avatar>
-            {sidebarOpen && (
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-sidebar-foreground truncate">
-                  Usuário
-                </p>
-                <p className="text-xs text-muted-foreground truncate">
-                  usuario@email.com
-                </p>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
+      <Sidebar />
 
       {/* Conteúdo Principal */}
       <div className="flex-1 overflow-auto">
@@ -222,10 +114,7 @@ export default function ReceitaPage() {
                 Gerencie todas as suas receitas
               </p>
             </div>
-            <Button className="bg-green-600 hover:bg-green-700 text-white">
-              <Plus className="h-4 w-4 mr-2" />
-              Nova Receita
-            </Button>
+            <ModalReceita onSave={() => { }} />
           </div>
         </header>
 

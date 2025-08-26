@@ -1,6 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { ModalDespesa } from "@/components/despesaModal";
+import { ModalReceita } from "@/components/receitaModal";
+import { Sidebar } from "@/components/sidebar";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -9,27 +12,14 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
-  Menu,
-  X,
-  Home,
-  TrendingUp,
-  TrendingDown,
-  DollarSign,
-  BarChart3,
-  Settings,
-  Plus,
-  ArrowUpRight,
   ArrowDownRight,
+  ArrowUpRight,
+  DollarSign,
+  Plus
 } from "lucide-react";
 
 export default function HomePage() {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-
-  const toggleSidebar = () => setSidebarOpen(!sidebarOpen);
-
   // Dados mockados para demonstração
   const saldoAtual = 15750.5;
   const entradasMes = 8500.0;
@@ -68,132 +58,21 @@ export default function HomePage() {
 
   return (
     <div className="flex h-screen bg-background">
-      {/* Sidebar */}
-      <div
-        className={`${
-          sidebarOpen ? "w-64" : "w-16"
-        } transition-all duration-300 bg-sidebar border-r border-sidebar-border flex flex-col`}
-      >
-        {/* Header da Sidebar */}
-        <div className="p-4 border-b border-sidebar-border">
-          <div className="flex items-center justify-between">
-            {sidebarOpen && (
-              <h2 className="text-lg font-semibold text-sidebar-foreground">
-                FluxoCaixa
-              </h2>
-            )}
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={toggleSidebar}
-              className="text-sidebar-foreground hover:bg-sidebar-accent"
-            >
-              {sidebarOpen ? (
-                <X className="h-4 w-4" />
-              ) : (
-                <Menu className="h-4 w-4" />
-              )}
-            </Button>
-          </div>
-        </div>
-
-        {/* Menu da Sidebar */}
-        <nav className="flex-1 p-2">
-          <div className="space-y-2">
-            <Button
-              variant="ghost"
-              className={`w-full ${
-                sidebarOpen ? "justify-start" : "justify-center"
-              } text-sidebar-foreground hover:bg-sidebar-accent`}
-            >
-              <Home className="h-4 w-4" />
-              {sidebarOpen && <span className="ml-2">Dashboard</span>}
-            </Button>
-            <Button
-              variant="ghost"
-              className={`w-full ${
-                sidebarOpen ? "justify-start" : "justify-center"
-              } text-sidebar-foreground hover:bg-sidebar-accent`}
-            >
-              <a href="/receita"></a>
-              <TrendingUp className="h-4 w-4" />
-              {sidebarOpen && <a href="/receita">Receitas</a>}
-            </Button>
-            <Button
-              variant="ghost"
-              className={`w-full ${
-                sidebarOpen ? "justify-start" : "justify-center"
-              } text-sidebar-foreground hover:bg-sidebar-accent`}
-            >
-              <TrendingDown className="h-4 w-4" />
-              {sidebarOpen && <span className="ml-2">Despesas</span>}
-            </Button>
-            <Button
-              variant="ghost"
-              className={`w-full ${
-                sidebarOpen ? "justify-start" : "justify-center"
-              } text-sidebar-foreground hover:bg-sidebar-accent`}
-            >
-              <BarChart3 className="h-4 w-4" />
-              {sidebarOpen && <span className="ml-2">Relatórios</span>}
-            </Button>
-            <Button
-              variant="ghost"
-              className={`w-full ${
-                sidebarOpen ? "justify-start" : "justify-center"
-              } text-sidebar-foreground hover:bg-sidebar-accent`}
-            >
-              <Settings className="h-4 w-4" />
-              {sidebarOpen && <span className="ml-2">Configurações</span>}
-            </Button>
-          </div>
-        </nav>
-
-        {/* Footer da Sidebar */}
-        <div className="p-4 border-t border-sidebar-border">
-          <div className="flex items-center space-x-2">
-            <Avatar className="h-8 w-8">
-              <AvatarFallback className="bg-primary text-primary-foreground">
-                U
-              </AvatarFallback>
-            </Avatar>
-            {sidebarOpen && (
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-sidebar-foreground truncate">
-                  Usuário
-                </p>
-                <p className="text-xs text-muted-foreground truncate">
-                  usuario@email.com
-                </p>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Conteúdo Principal */}
+      <Sidebar />
       <div className="flex-1 overflow-auto">
-        {/* Header */}
         <header className="bg-card border-b border-border p-6">
           <div className="flex items-center justify-between">
             <div>
+              <h1 className="text-sm">Olá Usuário</h1>
               <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
-              <p className="text-muted-foreground">
+              <p className="text-muted-foreground text-sm">
                 Visão geral do seu fluxo de caixa
               </p>
             </div>
             <div className="flex space-x-2">
-              <Button className="bg-green-600 hover:bg-green-700 text-white">
-                <Plus className="h-4 w-4 mr-2" />
-                Nova Receita
-              </Button>
-              <Button
-                variant="outline"
-                className="border-red-200 text-red-600 hover:bg-red-50 bg-transparent"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Nova Despesa
-              </Button>
+              <ModalReceita onSave={() => { }} />
+              <ModalDespesa onSave={() => { }} />
+
             </div>
           </div>
         </header>
@@ -280,11 +159,10 @@ export default function HomePage() {
                   >
                     <div className="flex items-center space-x-3">
                       <div
-                        className={`p-2 rounded-full ${
-                          transacao.tipo === "entrada"
-                            ? "bg-green-100 text-green-600"
-                            : "bg-red-100 text-red-600"
-                        }`}
+                        className={`p-2 rounded-full ${transacao.tipo === "entrada"
+                          ? "bg-green-100 text-green-600"
+                          : "bg-red-100 text-red-600"
+                          }`}
                       >
                         {transacao.tipo === "entrada" ? (
                           <ArrowUpRight className="h-4 w-4" />
@@ -303,11 +181,10 @@ export default function HomePage() {
                     </div>
                     <div className="text-right">
                       <p
-                        className={`font-semibold ${
-                          transacao.tipo === "entrada"
-                            ? "text-green-600"
-                            : "text-red-600"
-                        }`}
+                        className={`font-semibold ${transacao.tipo === "entrada"
+                          ? "text-green-600"
+                          : "text-red-600"
+                          }`}
                       >
                         {transacao.tipo === "entrada" ? "+" : "-"}R${" "}
                         {transacao.valor.toLocaleString("pt-BR", {
