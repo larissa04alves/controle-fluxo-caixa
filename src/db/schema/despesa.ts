@@ -10,9 +10,6 @@ export const despesa = pgTable("despesa", {
     status: varchar("status", { length: 50 }).notNull(),
     observacoes: text("observacoes"),
     usuarioId: integer("usuario_id")
-        .references(() => user.id, { onDelete: "cascade" }) // vínculo ao usuário
+        .references(() => user.id, { onDelete: "cascade" })
         .notNull(),
 });
-
-export type Despesa = typeof despesa.$inferSelect;
-export type NovaDespesa = typeof despesa.$inferInsert;

@@ -10,9 +10,6 @@ export const receita = pgTable("receita", {
     status: varchar("status", { length: 50 }).notNull(),
     observacoes: text("observacoes"),
     usuarioId: integer("usuario_id")
-        .references(() => user.id, { onDelete: "cascade" }) // vínculo ao usuário
+        .references(() => user.id, { onDelete: "cascade" })
         .notNull(),
 });
-
-export type Receita = typeof receita.$inferSelect;
-export type NovaReceita = typeof receita.$inferInsert;
