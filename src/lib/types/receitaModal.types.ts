@@ -20,7 +20,7 @@ export type ReceitaDadosApi = {
     data: string;
     status: ApiStatus;
     observacoes?: string | null;
-    usuarioId: number;
+    usuarioId?: number;
 };
 export type ReceitaUpdatePayload = Partial<ReceitaDadosApi>;
 

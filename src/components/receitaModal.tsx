@@ -18,6 +18,7 @@ import { cn } from "@/lib/utils";
 
 import { buildCreatePayloadForm, buildUpdatePayloadForm } from "@/lib/adapters/receita.adapter";
 import { ApiResponse, isApiError, ReceitaDadosUI, UiStatus } from "@/lib/types/receitaModal.types";
+import { toast } from "sonner";
 
 interface ModalReceitaProps {
     receita?: ReceitaDadosUI;
@@ -43,11 +44,8 @@ export function ModalReceita({ receita, usuarioId, onSave }: ModalReceitaProps) 
     async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
         e.preventDefault();
 
-        const uid = receita?.usuarioId ?? usuarioId;
-        if (!uid) {
-            alert("Usuário não definido.");
-            return;
-        }
+        const uid = Math.abs(parseInt(String(receita?.usuarioId ?? usuarioId ?? 1), 10));
+        // Usuário opcional: não bloqueia o fluxo se não houver usuário
 
         setSubmitting(true);
         try {
@@ -62,7 +60,7 @@ export function ModalReceita({ receita, usuarioId, onSave }: ModalReceitaProps) 
                 });
             } else {
                 const create = buildCreatePayloadForm(formData, uid);
-                res = await fetch("/api/receitas", {
+                res = await fetch("/api/receitaApi", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify(create),
@@ -73,16 +71,15 @@ export function ModalReceita({ receita, usuarioId, onSave }: ModalReceitaProps) 
 
             if (!res.ok || isApiError(json)) {
                 const message = isApiError(json) ? json.error : "Falha ao salvar a receita.";
-                console.error(json);
-                alert(message);
+                toast.error(message || "Erro ao salvar receita.", { description: "Verifique os dados e tente novamente." });
                 return;
             }
 
             onSave?.(json.data);
             setOpen(false);
-
-            onSave?.(json.data);
-            setOpen(false);
+            toast.success(isEditing ? "Receita atualizada com sucesso!" : "Receita adicionada com sucesso!", {
+                description: isEditing ? "As alterações foram salvas." : "A receita foi cadastrada.",
+            });
 
             if (!isEditing) {
                 setFormData({
@@ -96,7 +93,7 @@ export function ModalReceita({ receita, usuarioId, onSave }: ModalReceitaProps) 
             }
         } catch (err) {
             console.error(err);
-            alert("Erro de rede ao salvar a receita.");
+            toast.error("Erro de rede ao salvar a receita.", { description: "Não foi possível conectar ao servidor." });
         } finally {
             setSubmitting(false);
         }

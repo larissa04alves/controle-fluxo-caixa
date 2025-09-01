@@ -4,7 +4,6 @@ import { ModalDespesa } from "@/components/despesaModal";
 import { ModalReceita } from "@/components/receitaModal";
 import { Sidebar } from "@/components/sidebar";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -16,7 +15,6 @@ import {
   ArrowDownRight,
   ArrowUpRight,
   DollarSign,
-  Plus
 } from "lucide-react";
 
 export default function HomePage() {

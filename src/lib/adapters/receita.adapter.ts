@@ -44,7 +44,7 @@ export function buildCreatePayloadForm(
         status: UiStatus;
         observacoes?: string;
     },
-    usuarioId: number
+    usuarioId?: number
 ): ReceitaDadosApi {
     return {
         descricao: form.descricao.trim(),
@@ -53,7 +53,7 @@ export function buildCreatePayloadForm(
         data: dayjs(form.data).format("YYYY-MM-DD"),
         status: uiToApiStatus[form.status],
         observacoes: form.observacoes?.trim() || null,
-        usuarioId,
+        ...(usuarioId !== undefined ? { usuarioId } : {}),
     };
 }
 

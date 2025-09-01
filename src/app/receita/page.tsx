@@ -114,7 +114,7 @@ export default function ReceitaPage() {
                 Gerencie todas as suas receitas
               </p>
             </div>
-            <ModalReceita onSave={() => { }} />
+            <ModalReceita usuarioId={1} onSave={() => { }} />
           </div>
         </header>
 
