@@ -9,7 +9,7 @@ export type ReceitaDadosUI = {
     valor: number;
     data: string;
     status: UiStatus;
-    observacoes: string;
+    observacoes?: string;
     usuarioId: number;
 };
 
