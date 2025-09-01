@@ -1,84 +1,106 @@
-"use client"
-
-import type React from "react"
-
-import { useState } from "react"
-import { Button } from "@/components/ui/button"
+import type React from "react";
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
 import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-    DialogTrigger,
-} from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Textarea } from "@/components/ui/textarea"
-import { Calendar } from "@/components/ui/calendar"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { CalendarIcon, Plus } from "lucide-react"
-import dayjs from "dayjs"
-import "dayjs/locale/pt-br"
-import { cn } from "@/lib/utils"
+    Dialog, DialogContent, DialogDescription, DialogFooter,
+    DialogHeader, DialogTitle, DialogTrigger,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { CalendarIcon, Plus } from "lucide-react";
+import dayjs from "dayjs";
+import "dayjs/locale/pt-br";
+import { cn } from "@/lib/utils";
+
+import { buildCreatePayloadForm, buildUpdatePayloadForm } from "@/lib/adapters/receita.adapter";
+import { ApiResponse, isApiError, ReceitaDadosUI, UiStatus } from "@/lib/types/receitaModal.types";
 
 interface ModalReceitaProps {
-    receita?: {
-        id: number
-        descricao: string
-        categoria: string
-        valor: number
-        data: string
-        status: string
-        observacoes?: string
-    }
-    onSave?: (receita: unknown) => void
+    receita?: ReceitaDadosUI;
+    usuarioId?: number;
+    onSave?: (r: ReceitaDadosUI) => void;
 }
 
-export function ModalReceita({ receita, onSave }: ModalReceitaProps) {
-    const [open, setOpen] = useState(false)
+export function ModalReceita({ receita, usuarioId, onSave }: ModalReceitaProps) {
+    dayjs.locale("pt-br");
+    const isEditing = !!receita;
+
+    const [open, setOpen] = useState(false);
+    const [submitting, setSubmitting] = useState(false);
     const [formData, setFormData] = useState({
-        descricao: receita?.descricao || "",
-        categoria: receita?.categoria || "",
-        valor: receita?.valor?.toString() || "",
-        data: receita?.data ? new Date(receita.data) : new Date(),
-        status: receita?.status || "Pendente",
-        observacoes: receita?.observacoes || "",
-    })
+        descricao: receita?.descricao ?? "",
+        categoria: receita?.categoria ?? "",
+        valor: receita ? String(receita.valor) : "",
+        data: new Date(receita?.data ?? new Date()),
+        status: (receita?.status ?? "Pendente") as UiStatus,
+        observacoes: receita?.observacoes ?? "",
+    });
 
-    dayjs.locale("pt-br")
+    async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+        e.preventDefault();
 
-    const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-        e.preventDefault()
-
-        const novaReceita = {
-            id: receita?.id || Date.now(),
-            descricao: formData.descricao,
-            categoria: formData.categoria,
-            valor: Number.parseFloat(formData.valor),
-            data: dayjs(formData.data).format("YYYY-MM-DD"),
-            status: formData.status,
-            observacoes: formData.observacoes,
+        const uid = receita?.usuarioId ?? usuarioId;
+        if (!uid) {
+            alert("Usuário não definido.");
+            return;
         }
 
-        onSave?.(novaReceita)
-        setOpen(false)
+        setSubmitting(true);
+        try {
+            let res: Response;
 
-        if (!receita) {
-            setFormData({
-                descricao: "",
-                categoria: "",
-                valor: "",
-                data: new Date(),
-                status: "Pendente",
-                observacoes: "",
-            })
+            if (isEditing) {
+                const update = buildUpdatePayloadForm(formData);
+                res = await fetch(`/api/receitas/${receita!.id}`, {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(update),
+                });
+            } else {
+                const create = buildCreatePayloadForm(formData, uid);
+                res = await fetch("/api/receitas", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(create),
+                });
+            }
+
+            const json = (await res.json()) as ApiResponse<ReceitaDadosUI>;
+
+            if (!res.ok || isApiError(json)) {
+                const message = isApiError(json) ? json.error : "Falha ao salvar a receita.";
+                console.error(json);
+                alert(message);
+                return;
+            }
+
+            onSave?.(json.data);
+            setOpen(false);
+
+            onSave?.(json.data);
+            setOpen(false);
+
+            if (!isEditing) {
+                setFormData({
+                    descricao: "",
+                    categoria: "",
+                    valor: "",
+                    data: new Date(),
+                    status: "Pendente",
+                    observacoes: "",
+                });
+            }
+        } catch (err) {
+            console.error(err);
+            alert("Erro de rede ao salvar a receita.");
+        } finally {
+            setSubmitting(false);
         }
     }
-
-    const isEditing = !!receita
 
     return (
         <Dialog open={open} onOpenChange={setOpen}>
@@ -94,15 +116,15 @@ export function ModalReceita({ receita, onSave }: ModalReceitaProps) {
                     </Button>
                 )}
             </DialogTrigger>
+
             <DialogContent className="sm:max-w-[500px]">
                 <DialogHeader>
                     <DialogTitle>{isEditing ? "Editar Receita" : "Nova Receita"}</DialogTitle>
                     <DialogDescription>
-                        {isEditing
-                            ? "Edite as informações da receita abaixo."
-                            : "Preencha as informações para adicionar uma nova receita."}
+                        {isEditing ? "Edite as informações da receita abaixo." : "Preencha as informações para adicionar uma nova receita."}
                     </DialogDescription>
                 </DialogHeader>
+
                 <form onSubmit={handleSubmit}>
                     <div className="flex flex-col gap-6">
                         <div className="flex flex-col gap-2">
@@ -135,7 +157,6 @@ export function ModalReceita({ receita, onSave }: ModalReceitaProps) {
                                         <SelectItem value="Outros">Outros</SelectItem>
                                     </SelectContent>
                                 </Select>
-
                             </div>
 
                             <div className="w-1/2 gap-2 flex flex-col">
@@ -159,6 +180,7 @@ export function ModalReceita({ receita, onSave }: ModalReceitaProps) {
                                 <Popover>
                                     <PopoverTrigger asChild className="w-full">
                                         <Button
+                                            type="button"
                                             variant="outline"
                                             className={cn("justify-start text-left font-normal", !formData.data && "text-muted-foreground")}
                                         >
@@ -179,7 +201,10 @@ export function ModalReceita({ receita, onSave }: ModalReceitaProps) {
 
                             <div className="flex flex-col w-1/2 gap-2">
                                 <Label htmlFor="status">Status</Label>
-                                <Select value={formData.status} onValueChange={(value) => setFormData({ ...formData, status: value })}>
+                                <Select
+                                    value={formData.status}
+                                    onValueChange={(value) => setFormData({ ...formData, status: value as UiStatus })}
+                                >
                                     <SelectTrigger className="w-full">
                                         <SelectValue />
                                     </SelectTrigger>
@@ -203,16 +228,17 @@ export function ModalReceita({ receita, onSave }: ModalReceitaProps) {
                             />
                         </div>
                     </div>
+
                     <DialogFooter className="pt-6">
-                        <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+                        <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={submitting}>
                             Cancelar
                         </Button>
-                        <Button type="submit" className="bg-green-600 hover:bg-green-700 text-white">
+                        <Button type="submit" className="bg-green-600 hover:bg-green-700 text-white" disabled={submitting}>
                             {isEditing ? "Salvar Alterações" : "Adicionar Receita"}
                         </Button>
                     </DialogFooter>
                 </form>
             </DialogContent>
         </Dialog>
-    )
+    );
 }
