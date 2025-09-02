@@ -1,118 +1,154 @@
-"use client"
+"use client";
 
-import { Sidebar } from "@/components/sidebar"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Sidebar } from "@/components/sidebar";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import {
-    BarChart3,
-    DollarSign,
-    Edit,
-    Search,
-    Trash2,
-    TrendingDown
-} from "lucide-react"
-import { ModalDespesa } from "@/components/despesaModal"
-import { useState } from "react"
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
+import { BarChart3, DollarSign, Search, TrendingDown } from "lucide-react";
+import { ModalDespesa } from "@/components/despesaModal";
+import { useEffect, useState } from "react";
+import dayjs from "dayjs";
+import { DespesaDados } from "@/lib/types/despesaModal.types";
+import { ApiListResponse, ListMeta } from "@/lib/types/despesaPage.types";
+import { toast } from "sonner";
+import { useCalcDespesas } from "./useCalcDespesas";
+import { ModalDelete } from "@/components/deleteModal";
+
+dayjs.locale("pt-br");
+
+const qs = (params: Record<string, string | number | undefined | null>) => {
+    const search = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => {
+        if (v !== undefined && v !== null && String(v).length > 0) {
+            search.set(k, String(v));
+        }
+    });
+    return search.toString();
+};
 
 export default function DespesaPage() {
-    const [filtroCategoria, setFiltroCategoria] = useState("todas")
-    const [busca, setBusca] = useState("")
+    const [filtroCategoria, setFiltroCategoria] = useState<string>("todas");
+    const [filtroStatus, setFiltroStatus] = useState<string>("todos");
+    const [busca, setBusca] = useState<string>("");
+    const [debouncedBusca, setDebouncedBusca] = useState<string>("");
 
+    const [page, setPage] = useState<number>(1);
+    const [pageSize, setPageSize] = useState<number>(10);
 
-    const totalDespesas = 18450.0
-    const despesasMes = 6200.0
-    const mediaDespesas = 1025.56
+    const [itens, setItens] = useState<DespesaDados[]>([]);
+    const [meta, setMeta] = useState<ListMeta>({ page: 1, pageSize: 10, total: 0 });
+    const [loading, setLoading] = useState<boolean>(false);
+    const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-    const despesas = [
-        {
-            id: 1,
-            descricao: "Aluguel do escritório",
-            categoria: "Fixas",
-            valor: 2500.0,
-            data: "2024-01-15",
-            status: "Pago",
-        },
-        {
-            id: 2,
-            descricao: "Material de escritório",
-            categoria: "Operacionais",
-            valor: 450.0,
-            data: "2024-01-13",
-            status: "Pago",
-        },
-        {
-            id: 3,
-            descricao: "Combustível",
-            categoria: "Transporte",
-            valor: 320.0,
-            data: "2024-01-12",
-            status: "Pendente",
-        },
-        {
-            id: 4,
-            descricao: "Energia elétrica",
-            categoria: "Fixas",
-            valor: 680.0,
-            data: "2024-01-10",
-            status: "Pago",
-        },
-        {
-            id: 5,
-            descricao: "Marketing digital",
-            categoria: "Marketing",
-            valor: 1200.0,
-            data: "2024-01-08",
-            status: "Pago",
-        },
-        {
-            id: 6,
-            descricao: "Manutenção equipamentos",
-            categoria: "Operacionais",
-            valor: 850.0,
-            data: "2024-01-05",
-            status: "Pago",
-        },
-    ]
+    useEffect(() => {
+        const t = setTimeout(() => setDebouncedBusca(busca.trim()), 350);
+        return () => clearTimeout(t);
+    }, [busca]);
 
-    const despesasFiltradas = despesas.filter((despesa) => {
-        const matchCategoria = filtroCategoria === "todas" || despesa.categoria.toLowerCase() === filtroCategoria
-        const matchBusca = despesa.descricao.toLowerCase().includes(busca.toLowerCase())
-        return matchCategoria && matchBusca
-    })
+    const carregar = async () => {
+        setLoading(true);
+        setErrorMsg(null);
+        try {
+            const params = {
+                usuarioId: 1,
+                page,
+                pageSize,
+                categoria: filtroCategoria !== "todas" ? filtroCategoria : undefined,
+                status: filtroStatus !== "todos" ? filtroStatus : undefined,
+                texto: debouncedBusca || undefined,
+                dataInicial: "2025-01-01",
+                dataFinal: "2025-12-31",
+            };
+
+            const res = await fetch(`/api/despesaApi?${qs(params)}`, { cache: "no-store" });
+            if (!res.ok) {
+                throw new Error(`Falha ao carregar despesas (${res.status})`);
+            }
+            const json: ApiListResponse<DespesaDados> = await res.json();
+            setItens(json.data);
+            setMeta(json.meta);
+        } catch (error: unknown) {
+            setErrorMsg((error as Error)?.message ?? "Erro ao carregar dados");
+            setItens([]);
+            setMeta((m) => ({ ...m, total: 0 }));
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        carregar();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [filtroCategoria, filtroStatus, debouncedBusca, page, pageSize]);
+
+    const handleSaved = () => {
+        setPage(1);
+        carregar();
+    };
+
+    const { totalDespesas, despesasMes, mediaDespesas, totalPages, percentualMesAnterior } =
+        useCalcDespesas({
+            itens,
+            meta,
+        });
+
+    const handleDelete = async (id?: number) => {
+        try {
+            const res = await fetch(`/api/despesaApi/${id}`, { method: "DELETE" });
+            if (!res.ok) throw new Error("Não foi possível excluir.");
+            const restam = itens.length - 1;
+            if (restam <= 0 && page > 1) setPage((p) => p - 1);
+            else carregar();
+
+            toast.success("Despesa excluída com sucesso!", {
+                description: "A despesa foi removida do sistema.",
+            });
+        } catch (error: unknown) {
+            const message = (error as Error)?.message ?? "Erro ao excluir.";
+            toast.error("Erro ao excluir despesa", {
+                description: message,
+            });
+        }
+    };
 
     return (
         <div className="flex h-screen bg-background">
-            {/* Sidebar - mesma estrutura da página principal */}
             <Sidebar />
 
-            {/* Conteúdo Principal */}
             <div className="flex-1 overflow-auto">
-                {/* Header */}
                 <header className="bg-card border-b border-border p-6">
                     <div className="flex items-center justify-between">
                         <div>
                             <h1 className="text-2xl font-bold text-foreground">Despesas</h1>
                             <p className="text-muted-foreground">Gerencie todas as suas despesas</p>
                         </div>
-                        <ModalDespesa onSave={() => { }} />
+                        <ModalDespesa onSave={handleSaved} usuarioId={1} />
                     </div>
                 </header>
 
-                {/* Conteúdo */}
                 <main className="p-6 space-y-6">
-                    {/* Cards de Resumo */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                         <Card className="bg-red-50 border-red-200">
                             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                <CardTitle className="text-sm font-medium text-red-800">Total de Despesas</CardTitle>
+                                <CardTitle className="text-sm font-medium text-red-800">
+                                    Total de Despesas
+                                </CardTitle>
                                 <DollarSign className="h-4 w-4 text-red-600" />
                             </CardHeader>
                             <CardContent>
                                 <div className="text-2xl font-bold text-red-900">
-                                    R$ {totalDespesas.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                                    R${" "}
+                                    {totalDespesas.toLocaleString("pt-BR", {
+                                        minimumFractionDigits: 2,
+                                    })}
                                 </div>
                                 <p className="text-xs text-red-600 mt-1">Acumulado no período</p>
                             </CardContent>
@@ -120,32 +156,53 @@ export default function DespesaPage() {
 
                         <Card className="bg-orange-50 border-orange-200">
                             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                <CardTitle className="text-sm font-medium text-orange-800">Despesas do Mês</CardTitle>
+                                <CardTitle className="text-sm font-medium text-orange-800">
+                                    Despesas do Mês
+                                </CardTitle>
                                 <TrendingDown className="h-4 w-4 text-orange-600" />
                             </CardHeader>
                             <CardContent>
                                 <div className="text-2xl font-bold text-orange-900">
-                                    R$ {despesasMes.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                                    R${" "}
+                                    {despesasMes.toLocaleString("pt-BR", {
+                                        minimumFractionDigits: 2,
+                                    })}
                                 </div>
-                                <p className="text-xs text-orange-600 mt-1">-8% em relação ao mês anterior</p>
+                                <p className="text-xs text-orange-600 mt-1">
+                                    {percentualMesAnterior > 0
+                                        ? `+${percentualMesAnterior.toFixed(
+                                              1
+                                          )}% em relação ao mês anterior`
+                                        : percentualMesAnterior < 0
+                                        ? `${percentualMesAnterior.toFixed(
+                                              1
+                                          )}% em relação ao mês anterior`
+                                        : "Sem dados do mês anterior"}
+                                </p>
                             </CardContent>
                         </Card>
 
                         <Card className="bg-purple-50 border-purple-200">
                             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                <CardTitle className="text-sm font-medium text-purple-800">Média por Despesa</CardTitle>
+                                <CardTitle className="text-sm font-medium text-purple-800">
+                                    Média por Despesa
+                                </CardTitle>
                                 <BarChart3 className="h-4 w-4 text-purple-600" />
                             </CardHeader>
                             <CardContent>
                                 <div className="text-2xl font-bold text-purple-900">
-                                    R$ {mediaDespesas.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                                    R${" "}
+                                    {mediaDespesas.toLocaleString("pt-BR", {
+                                        minimumFractionDigits: 2,
+                                    })}
                                 </div>
-                                <p className="text-xs text-purple-600 mt-1">Valor médio por transação</p>
+                                <p className="text-xs text-purple-600 mt-1">
+                                    Valor médio por transação
+                                </p>
                             </CardContent>
                         </Card>
                     </div>
 
-                    {/* Filtros e Busca */}
                     <Card>
                         <CardHeader>
                             <CardTitle>Filtros</CardTitle>
@@ -156,14 +213,20 @@ export default function DespesaPage() {
                                     <div className="relative">
                                         <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                                         <Input
-                                            placeholder="Buscar despesas..."
+                                            placeholder="Buscar por despesas..."
                                             value={busca}
                                             onChange={(e) => setBusca(e.target.value)}
                                             className="pl-10"
                                         />
                                     </div>
                                 </div>
-                                <Select value={filtroCategoria} onValueChange={setFiltroCategoria}>
+                                <Select
+                                    value={filtroCategoria}
+                                    onValueChange={(v) => {
+                                        setPage(1);
+                                        setFiltroCategoria(v);
+                                    }}
+                                >
                                     <SelectTrigger className="w-full md:w-48">
                                         <SelectValue placeholder="Categoria" />
                                     </SelectTrigger>
@@ -175,19 +238,68 @@ export default function DespesaPage() {
                                         <SelectItem value="marketing">Marketing</SelectItem>
                                     </SelectContent>
                                 </Select>
+
+                                <Select
+                                    value={filtroStatus}
+                                    onValueChange={(v) => {
+                                        setPage(1);
+                                        setFiltroStatus(v);
+                                    }}
+                                >
+                                    <SelectTrigger className="w-full md:w-48">
+                                        <SelectValue placeholder="Status" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="todos">Todos</SelectItem>
+                                        <SelectItem value="Pago">Pago</SelectItem>
+                                        <SelectItem value="Pendente">Pendente</SelectItem>
+                                    </SelectContent>
+                                </Select>
+
+                                <Select
+                                    value={String(pageSize)}
+                                    onValueChange={(v) => {
+                                        setPage(1);
+                                        setPageSize(Number(v));
+                                    }}
+                                >
+                                    <SelectTrigger className="w-full md:w-40">
+                                        <SelectValue placeholder="Itens por página" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="5">5</SelectItem>
+                                        <SelectItem value="10">10</SelectItem>
+                                        <SelectItem value="20">20</SelectItem>
+                                        <SelectItem value="50">50</SelectItem>
+                                    </SelectContent>
+                                </Select>
                             </div>
                         </CardContent>
                     </Card>
 
-                    {/* Lista de Despesas */}
                     <Card>
                         <CardHeader>
                             <CardTitle>Lista de Despesas</CardTitle>
-                            <CardDescription>{despesasFiltradas.length} despesa(s) encontrada(s)</CardDescription>
+                            <CardDescription>
+                                {loading
+                                    ? "Carregando..."
+                                    : `${meta.total} despesa(s) encontrada(s)${
+                                          debouncedBusca ? ` para "${debouncedBusca}"` : ""
+                                      }`}
+                                {errorMsg ? (
+                                    <span className="ml-2 text-destructive">— {errorMsg}</span>
+                                ) : null}
+                            </CardDescription>
                         </CardHeader>
                         <CardContent>
                             <div className="space-y-4">
-                                {despesasFiltradas.map((despesa) => (
+                                {!loading && itens.length === 0 ? (
+                                    <p className="text-sm text-muted-foreground">
+                                        Nenhum registro encontrado.
+                                    </p>
+                                ) : null}
+
+                                {itens.map((despesa) => (
                                     <div
                                         key={despesa.id}
                                         className="flex items-center justify-between p-4 rounded-lg border border-border hover:bg-muted/50 transition-colors"
@@ -197,40 +309,83 @@ export default function DespesaPage() {
                                                 <TrendingDown className="h-4 w-4" />
                                             </div>
                                             <div>
-                                                <p className="font-medium text-foreground">{despesa.descricao}</p>
+                                                <p className="font-medium text-foreground">
+                                                    {despesa.descricao}
+                                                </p>
                                                 <div className="flex items-center space-x-2 mt-1">
                                                     <Badge variant="outline" className="text-xs">
                                                         {despesa.categoria}
                                                     </Badge>
-                                                    <span className="text-sm text-muted-foreground">{despesa.data}</span>
+                                                    <span className="text-sm text-muted-foreground">
+                                                        {dayjs(despesa.data).format("DD/MM/YYYY")}
+                                                    </span>
                                                 </div>
                                             </div>
                                         </div>
                                         <div className="flex items-center space-x-4">
                                             <div className="text-right">
                                                 <p className="font-semibold text-red-600">
-                                                    R$ {despesa.valor.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                                                    {(typeof despesa.valor === "string"
+                                                        ? parseFloat(despesa.valor)
+                                                        : despesa.valor
+                                                    ).toLocaleString("pt-BR", {
+                                                        style: "currency",
+                                                        currency: "BRL",
+                                                        minimumFractionDigits: 2,
+                                                    })}
                                                 </p>
-                                                <Badge variant={despesa.status === "Pago" ? "default" : "secondary"} className="text-xs">
+                                                <Badge
+                                                    variant={
+                                                        despesa.status === "pago"
+                                                            ? "default"
+                                                            : "secondary"
+                                                    }
+                                                    className="text-xs"
+                                                >
                                                     {despesa.status}
                                                 </Badge>
                                             </div>
                                             <div className="flex space-x-2">
-                                                <Button variant="ghost" size="icon" className="h-8 w-8">
-                                                    <Edit className="h-4 w-4" />
-                                                </Button>
-                                                <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600 hover:text-red-700">
-                                                    <Trash2 className="h-4 w-4" />
-                                                </Button>
+                                                <ModalDespesa
+                                                    despesa={despesa}
+                                                    usuarioId={1}
+                                                    onSave={handleSaved}
+                                                />
+                                                <ModalDelete
+                                                    itemName={despesa.descricao}
+                                                    itemType="despesa"
+                                                    onConfirm={() => handleDelete(despesa.id)}
+                                                />
                                             </div>
                                         </div>
                                     </div>
                                 ))}
+                            </div>
+                            <div className="mt-6 flex items-center justify-between">
+                                <p className="text-sm text-muted-foreground">
+                                    Página {meta.page} de {totalPages}
+                                </p>
+                                <div className="space-x-2">
+                                    <Button
+                                        variant="outline"
+                                        disabled={loading || page <= 1}
+                                        onClick={() => setPage((p) => Math.max(1, p - 1))}
+                                    >
+                                        Anterior
+                                    </Button>
+                                    <Button
+                                        variant="outline"
+                                        disabled={loading || page >= totalPages}
+                                        onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                                    >
+                                        Próxima
+                                    </Button>
+                                </div>
                             </div>
                         </CardContent>
                     </Card>
                 </main>
             </div>
         </div>
-    )
+    );
 }

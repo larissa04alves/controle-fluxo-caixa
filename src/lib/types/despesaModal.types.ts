@@ -4,7 +4,7 @@ export type DespesaDados = {
     id?: number;
     descricao: string;
     categoria: string;
-    valor: number;
+    valor: number | string;
     data: string;
     status: status;
     observacoes?: string | null;

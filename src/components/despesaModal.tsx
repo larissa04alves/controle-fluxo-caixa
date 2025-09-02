@@ -25,7 +25,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarIcon, Plus } from "lucide-react";
+import { CalendarIcon, Edit, Plus } from "lucide-react";
 import dayjs from "dayjs";
 import "dayjs/locale/pt-br";
 import { cn } from "@/lib/utils";
@@ -125,7 +125,7 @@ export function ModalDespesa({ despesa, onSave, usuarioId }: ModalDespesaProps) 
             <DialogTrigger asChild>
                 {isEditing ? (
                     <Button variant="ghost" size="icon" className="h-8 w-8">
-                        <Plus className="h-4 w-4" />
+                        <Edit className="h-4 w-4" />
                     </Button>
                 ) : (
                     <Button className="bg-red-600 hover:bg-red-700 text-white">
