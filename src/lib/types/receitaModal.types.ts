@@ -1,4 +1,3 @@
-// Status
 export type ApiStatus = "pendente" | "pago" | "cancelado";
 export type UiStatus = "Pendente" | "Recebido" | "Cancelado";
 

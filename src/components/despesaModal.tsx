@@ -1,9 +1,9 @@
-"use client"
+"use client";
 
-import type React from "react"
+import type React from "react";
 
-import { useState } from "react"
-import { Button } from "@/components/ui/button"
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
 import {
     Dialog,
     DialogContent,
@@ -12,73 +12,113 @@ import {
     DialogHeader,
     DialogTitle,
     DialogTrigger,
-} from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Textarea } from "@/components/ui/textarea"
-import { Calendar } from "@/components/ui/calendar"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { CalendarIcon, Plus } from "lucide-react"
-import dayjs from "dayjs"
-import "dayjs/locale/pt-br"
-import { cn } from "@/lib/utils"
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { CalendarIcon, Plus } from "lucide-react";
+import dayjs from "dayjs";
+import "dayjs/locale/pt-br";
+import { cn } from "@/lib/utils";
+import { ApiResponse, DespesaDados, isApiError, status } from "@/lib/types/despesaModal.types";
+import { toast } from "sonner";
 
 interface ModalDespesaProps {
-    despesa?: {
-        id: number
-        descricao: string
-        categoria: string
-        valor: number
-        data: string
-        status: string
-        observacoes?: string
-    }
-    onSave?: (despesa: unknown) => void
+    despesa?: DespesaDados;
+    usuarioId?: number;
+    onSave?: (r: DespesaDados) => void;
 }
 
-export function ModalDespesa({ despesa, onSave }: ModalDespesaProps) {
-    const [open, setOpen] = useState(false)
+export function ModalDespesa({ despesa, onSave, usuarioId }: ModalDespesaProps) {
+    dayjs.locale("pt-br");
+    const isEditing = !!despesa;
+
+    const [open, setOpen] = useState(false);
+    const [submitting, setSubmitting] = useState(false);
     const [formData, setFormData] = useState({
-        descricao: despesa?.descricao || "",
-        categoria: despesa?.categoria || "",
-        valor: despesa?.valor?.toString() || "",
-        data: despesa?.data ? new Date(despesa.data) : new Date(),
-        status: despesa?.status || "Pendente",
-        observacoes: despesa?.observacoes || "",
-    })
+        descricao: despesa?.descricao ?? "",
+        categoria: despesa?.categoria ?? "",
+        valor: despesa ? String(despesa.valor) : "",
+        data: new Date(despesa?.data ?? new Date()),
+        status: (despesa?.status ?? "Pendente") as status,
+        observacoes: despesa?.observacoes ?? "",
+    });
 
-    dayjs.locale("pt-br")
+    async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+        e.preventDefault();
 
-    const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-        e.preventDefault()
-
-        const novaDespesa = {
-            id: despesa?.id || Date.now(),
-            descricao: formData.descricao,
-            categoria: formData.categoria,
-            valor: Number.parseFloat(formData.valor),
-            data: dayjs(formData.data).format("YYYY-MM-DD"),
-            status: formData.status,
-            observacoes: formData.observacoes,
-        }
-
-        onSave?.(novaDespesa)
-        setOpen(false)
-
-        if (!despesa) {
-            setFormData({
-                descricao: "",
-                categoria: "",
-                valor: "",
-                data: new Date(),
-                status: "Pendente",
-                observacoes: "",
-            })
+        const uid = Math.abs(parseInt(String(despesa?.usuarioId ?? usuarioId ?? 1), 10));
+        setSubmitting(true);
+        try {
+            let res: Response;
+            const payload = {
+                descricao: formData.descricao,
+                categoria: formData.categoria,
+                valor: parseFloat(formData.valor),
+                data: formData.data,
+                status: formData.status,
+                observacoes: formData.observacoes,
+                usuarioId: uid,
+            };
+            if (isEditing && despesa?.id) {
+                res = await fetch(`/api/despesaApi/${despesa.id}`, {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload),
+                });
+            } else {
+                res = await fetch("/api/despesaApi", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload),
+                });
+            }
+            const json = (await res.json()) as ApiResponse<DespesaDados>;
+            if (!res.ok || isApiError(json)) {
+                const message = isApiError(json) ? json.error : "Falha ao salvar a despesa.";
+                toast.error(message || "Erro ao salvar despesa.", {
+                    description: "Verifique os dados e tente novamente.",
+                });
+                return;
+            }
+            onSave?.(json.data);
+            setOpen(false);
+            toast.success(
+                isEditing ? "Despesa atualizada com sucesso!" : "Despesa adicionada com sucesso!",
+                {
+                    description: isEditing
+                        ? "As alterações foram salvas."
+                        : "A despesa foi cadastrada.",
+                }
+            );
+            if (!isEditing) {
+                setFormData({
+                    descricao: "",
+                    categoria: "",
+                    valor: "",
+                    data: new Date(),
+                    status: "pendente" as status,
+                    observacoes: "",
+                });
+            }
+        } catch (err) {
+            console.error(err);
+            toast.error("Erro de rede ao salvar a despesa.", {
+                description: "Não foi possível conectar ao servidor.",
+            });
+        } finally {
+            setSubmitting(false);
         }
     }
-
-    const isEditing = !!despesa
 
     return (
         <Dialog open={open} onOpenChange={setOpen}>
@@ -111,7 +151,9 @@ export function ModalDespesa({ despesa, onSave }: ModalDespesaProps) {
                                 id="descricao"
                                 placeholder="Ex: Venda de produto, Prestação de serviço..."
                                 value={formData.descricao}
-                                onChange={(e) => setFormData({ ...formData, descricao: e.target.value })}
+                                onChange={(e) =>
+                                    setFormData({ ...formData, descricao: e.target.value })
+                                }
                                 required
                             />
                         </div>
@@ -121,7 +163,9 @@ export function ModalDespesa({ despesa, onSave }: ModalDespesaProps) {
                                 <Label htmlFor="categoria">Categoria *</Label>
                                 <Select
                                     value={formData.categoria}
-                                    onValueChange={(value) => setFormData({ ...formData, categoria: value })}
+                                    onValueChange={(value) =>
+                                        setFormData({ ...formData, categoria: value })
+                                    }
                                     required
                                 >
                                     <SelectTrigger className="w-full">
@@ -135,7 +179,6 @@ export function ModalDespesa({ despesa, onSave }: ModalDespesaProps) {
                                         <SelectItem value="Outros">Outros</SelectItem>
                                     </SelectContent>
                                 </Select>
-
                             </div>
 
                             <div className="w-1/2 gap-2 flex flex-col">
@@ -147,7 +190,9 @@ export function ModalDespesa({ despesa, onSave }: ModalDespesaProps) {
                                     min="0"
                                     placeholder="0,00"
                                     value={formData.valor}
-                                    onChange={(e) => setFormData({ ...formData, valor: e.target.value })}
+                                    onChange={(e) =>
+                                        setFormData({ ...formData, valor: e.target.value })
+                                    }
                                     required
                                 />
                             </div>
@@ -160,17 +205,26 @@ export function ModalDespesa({ despesa, onSave }: ModalDespesaProps) {
                                     <PopoverTrigger asChild className="w-full">
                                         <Button
                                             variant="outline"
-                                            className={cn("justify-start text-left font-normal", !formData.data && "text-muted-foreground")}
+                                            className={cn(
+                                                "justify-start text-left font-normal",
+                                                !formData.data && "text-muted-foreground"
+                                            )}
                                         >
                                             <CalendarIcon className="mr-2 h-4 w-4" />
-                                            {formData.data ? dayjs(formData.data).format("DD/MM/YYYY") : <span>Selecione a data</span>}
+                                            {formData.data ? (
+                                                dayjs(formData.data).format("DD/MM/YYYY")
+                                            ) : (
+                                                <span>Selecione a data</span>
+                                            )}
                                         </Button>
                                     </PopoverTrigger>
                                     <PopoverContent className="w-auto p-0">
                                         <Calendar
                                             mode="single"
                                             selected={formData.data}
-                                            onSelect={(date) => date && setFormData({ ...formData, data: date })}
+                                            onSelect={(date) =>
+                                                date && setFormData({ ...formData, data: date })
+                                            }
                                             initialFocus
                                         />
                                     </PopoverContent>
@@ -179,14 +233,19 @@ export function ModalDespesa({ despesa, onSave }: ModalDespesaProps) {
 
                             <div className="flex flex-col w-1/2 gap-2">
                                 <Label htmlFor="status">Status</Label>
-                                <Select value={formData.status} onValueChange={(value) => setFormData({ ...formData, status: value })}>
+                                <Select
+                                    value={formData.status}
+                                    onValueChange={(value) =>
+                                        setFormData({ ...formData, status: value as status })
+                                    }
+                                >
                                     <SelectTrigger className="w-full">
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="Pendente">Pendente</SelectItem>
-                                        <SelectItem value="Recebido">Recebido</SelectItem>
-                                        <SelectItem value="Cancelado">Cancelado</SelectItem>
+                                        <SelectItem value="pendente">Pendente</SelectItem>
+                                        <SelectItem value="pago">Pago</SelectItem>
+                                        <SelectItem value="cancelado">Cancelado</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>
@@ -198,21 +257,32 @@ export function ModalDespesa({ despesa, onSave }: ModalDespesaProps) {
                                 id="observacoes"
                                 placeholder="Informações adicionais sobre a despesa..."
                                 value={formData.observacoes}
-                                onChange={(e) => setFormData({ ...formData, observacoes: e.target.value })}
+                                onChange={(e) =>
+                                    setFormData({ ...formData, observacoes: e.target.value })
+                                }
                                 rows={3}
                             />
                         </div>
                     </div>
                     <DialogFooter className="pt-6">
-                        <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setOpen(false)}
+                            disabled={submitting}
+                        >
                             Cancelar
                         </Button>
-                        <Button type="submit" className="bg-red-600 hover:bg-red-700 text-white">
+                        <Button
+                            type="submit"
+                            className="bg-red-600 hover:bg-red-700 text-white"
+                            disabled={submitting}
+                        >
                             {isEditing ? "Salvar Alterações" : "Adicionar despesa"}
                         </Button>
                     </DialogFooter>
                 </form>
             </DialogContent>
         </Dialog>
-    )
+    );
 }
