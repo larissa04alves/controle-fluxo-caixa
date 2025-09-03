@@ -21,10 +21,29 @@ import { ModalDelete } from "@/components/deleteModal";
 import { BarChart3, DollarSign, Search, TrendingUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ApiListResponse, ListMeta, ReceitaDadosUi } from "@/lib/types/receitaPage.types";
+import { ReceitaDados, status } from "@/lib/types/receitaModal.types";
 import { useCalcReceitas } from "./useCalcReceitas";
+import { useFilterDate } from "./useFilterDate";
 import { toast } from "sonner";
 
 dayjs.locale("pt-br");
+
+const uiToModalStatus: Record<string, status> = {
+    Recebido: "recebido",
+    Pendente: "pendente",
+    Cancelado: "cancelado",
+};
+
+const convertUiToModal = (r: ReceitaDadosUi): ReceitaDados => ({
+    id: r.id,
+    descricao: r.descricao,
+    categoria: r.categoria,
+    valor: r.valor,
+    data: r.data,
+    status: uiToModalStatus[r.status] || "pendente",
+    observacoes: r.observacoes,
+    usuarioId: r.usuarioId,
+});
 
 const qs = (params: Record<string, string | number | undefined | null>) => {
     const search = new URLSearchParams();
@@ -39,6 +58,7 @@ const qs = (params: Record<string, string | number | undefined | null>) => {
 export default function ReceitaPage() {
     const [filtroCategoria, setFiltroCategoria] = useState<string>("todas");
     const [filtroStatus, setFiltroStatus] = useState<string>("todos");
+    const [filtroMes, setFiltroMes] = useState<string>("todos");
     const [busca, setBusca] = useState<string>("");
     const [debouncedBusca, setDebouncedBusca] = useState<string>("");
 
@@ -49,6 +69,8 @@ export default function ReceitaPage() {
     const [meta, setMeta] = useState<ListMeta>({ page: 1, pageSize: 10, total: 0 });
     const [loading, setLoading] = useState<boolean>(false);
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+    const { dataInicial, dataFinal, MonthSelectComponent } = useFilterDate(filtroMes, setFiltroMes);
 
     useEffect(() => {
         const t = setTimeout(() => setDebouncedBusca(busca.trim()), 350);
@@ -66,8 +88,8 @@ export default function ReceitaPage() {
                 categoria: filtroCategoria !== "todas" ? filtroCategoria : undefined,
                 status: filtroStatus !== "todos" ? filtroStatus : undefined,
                 texto: debouncedBusca || undefined,
-                dataInicial: "2025-01-01",
-                dataFinal: "2025-12-31",
+                dataInicial,
+                dataFinal,
             };
 
             const res = await fetch(`/api/receitaApi?${qs(params)}`, { cache: "no-store" });
@@ -89,7 +111,7 @@ export default function ReceitaPage() {
     useEffect(() => {
         carregar();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [filtroCategoria, filtroStatus, debouncedBusca, page, pageSize]);
+    }, [filtroCategoria, filtroStatus, filtroMes, debouncedBusca, page, pageSize]);
 
     const handleSaved = () => {
         setPage(1);
@@ -97,7 +119,7 @@ export default function ReceitaPage() {
     };
 
     const { totalReceitas, receitasMes, mediaReceitas, totalPages } = useCalcReceitas({
-        itens,
+        itens: itens.map(convertUiToModal),
         meta,
     });
 
@@ -231,9 +253,16 @@ export default function ReceitaPage() {
                                     </SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="todas">Todas as categorias</SelectItem>
-                                        <SelectItem value="vendas">Vendas</SelectItem>
-                                        <SelectItem value="serviços">Serviços</SelectItem>
-                                        <SelectItem value="comissões">Comissões</SelectItem>
+                                        <SelectItem value="Retirada de Sócio">
+                                            Retirada de Sócio
+                                        </SelectItem>
+                                        <SelectItem value="pix">Pix</SelectItem>
+                                        <SelectItem value="debito">Cartão de Débito</SelectItem>
+                                        <SelectItem value="credito">Cartão de Crédito</SelectItem>
+                                        <SelectItem value="boletos">Boletos</SelectItem>
+                                        <SelectItem value="dinheiro">Dinheiro</SelectItem>
+                                        <SelectItem value="cheque">Cheque</SelectItem>
+                                        <SelectItem value="transferencia">Transferência</SelectItem>
                                         <SelectItem value="outros">Outros</SelectItem>
                                     </SelectContent>
                                 </Select>
@@ -252,6 +281,7 @@ export default function ReceitaPage() {
                                         <SelectItem value="todos">Todos</SelectItem>
                                         <SelectItem value="Recebido">Recebido</SelectItem>
                                         <SelectItem value="Pendente">Pendente</SelectItem>
+                                        <SelectItem value="Cancelado">Cancelado</SelectItem>
                                     </SelectContent>
                                 </Select>
 
@@ -272,6 +302,11 @@ export default function ReceitaPage() {
                                         <SelectItem value="50">50</SelectItem>
                                     </SelectContent>
                                 </Select>
+                                <MonthSelectComponent
+                                    filtroMes={filtroMes}
+                                    setFiltroMes={setFiltroMes}
+                                    setPage={setPage}
+                                />
                             </div>
                         </CardContent>
                     </Card>
@@ -347,7 +382,7 @@ export default function ReceitaPage() {
                                             </div>
                                             <div className="flex space-x-2">
                                                 <ModalReceita
-                                                    receita={r}
+                                                    receita={convertUiToModal(r)}
                                                     usuarioId={1}
                                                     onSave={handleSaved}
                                                 />

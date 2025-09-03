@@ -2,12 +2,23 @@ import type React from "react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
-    Dialog, DialogContent, DialogDescription, DialogFooter,
-    DialogHeader, DialogTitle, DialogTrigger,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -16,14 +27,13 @@ import dayjs from "dayjs";
 import "dayjs/locale/pt-br";
 import { cn } from "@/lib/utils";
 
-import { buildCreatePayloadForm, buildUpdatePayloadForm } from "@/lib/adapters/receita.adapter";
-import { ApiResponse, isApiError, ReceitaDadosUI, UiStatus } from "@/lib/types/receitaModal.types";
+import { ApiResponse, isApiError, ReceitaDados, status } from "@/lib/types/receitaModal.types";
 import { toast } from "sonner";
 
 interface ModalReceitaProps {
-    receita?: ReceitaDadosUI;
+    receita?: ReceitaDados;
     usuarioId?: number;
-    onSave?: (r: ReceitaDadosUI) => void;
+    onSave?: (r: ReceitaDados) => void;
 }
 
 export function ModalReceita({ receita, usuarioId, onSave }: ModalReceitaProps) {
@@ -37,7 +47,7 @@ export function ModalReceita({ receita, usuarioId, onSave }: ModalReceitaProps) 
         categoria: receita?.categoria ?? "",
         valor: receita ? String(receita.valor) : "",
         data: new Date(receita?.data ?? new Date()),
-        status: (receita?.status ?? "Pendente") as UiStatus,
+        status: (receita?.status ?? "pendente") as status,
         observacoes: receita?.observacoes ?? "",
     });
 
@@ -50,36 +60,49 @@ export function ModalReceita({ receita, usuarioId, onSave }: ModalReceitaProps) 
         setSubmitting(true);
         try {
             let res: Response;
-
-            if (isEditing) {
-                const update = buildUpdatePayloadForm(formData);
+            const payload = {
+                descricao: formData.descricao,
+                categoria: formData.categoria,
+                valor: parseFloat(formData.valor),
+                data: formData.data,
+                status: formData.status,
+                observacoes: formData.observacoes,
+                usuarioId: uid,
+            };
+            if (isEditing && receita?.id) {
                 res = await fetch(`/api/receitaApi/${receita!.id}`, {
                     method: "PATCH",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(update),
+                    body: JSON.stringify(payload),
                 });
             } else {
-                const create = buildCreatePayloadForm(formData, uid);
                 res = await fetch("/api/receitaApi", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(create),
+                    body: JSON.stringify(payload),
                 });
             }
 
-            const json = (await res.json()) as ApiResponse<ReceitaDadosUI>;
+            const json = (await res.json()) as ApiResponse<ReceitaDados>;
 
             if (!res.ok || isApiError(json)) {
                 const message = isApiError(json) ? json.error : "Falha ao salvar a receita.";
-                toast.error(message || "Erro ao salvar receita.", { description: "Verifique os dados e tente novamente." });
+                toast.error(message || "Erro ao salvar receita.", {
+                    description: "Verifique os dados e tente novamente.",
+                });
                 return;
             }
 
             onSave?.(json.data);
             setOpen(false);
-            toast.success(isEditing ? "Receita atualizada com sucesso!" : "Receita adicionada com sucesso!", {
-                description: isEditing ? "As alterações foram salvas." : "A receita foi cadastrada.",
-            });
+            toast.success(
+                isEditing ? "Receita atualizada com sucesso!" : "Receita adicionada com sucesso!",
+                {
+                    description: isEditing
+                        ? "As alterações foram salvas."
+                        : "A receita foi cadastrada.",
+                }
+            );
 
             if (!isEditing) {
                 setFormData({
@@ -87,13 +110,15 @@ export function ModalReceita({ receita, usuarioId, onSave }: ModalReceitaProps) 
                     categoria: "",
                     valor: "",
                     data: new Date(),
-                    status: "Pendente",
+                    status: "pendente",
                     observacoes: "",
                 });
             }
         } catch (err) {
             console.error(err);
-            toast.error("Erro de rede ao salvar a receita.", { description: "Não foi possível conectar ao servidor." });
+            toast.error("Erro de rede ao salvar a receita.", {
+                description: "Não foi possível conectar ao servidor.",
+            });
         } finally {
             setSubmitting(false);
         }
@@ -118,7 +143,9 @@ export function ModalReceita({ receita, usuarioId, onSave }: ModalReceitaProps) 
                 <DialogHeader>
                     <DialogTitle>{isEditing ? "Editar Receita" : "Nova Receita"}</DialogTitle>
                     <DialogDescription>
-                        {isEditing ? "Edite as informações da receita abaixo." : "Preencha as informações para adicionar uma nova receita."}
+                        {isEditing
+                            ? "Edite as informações da receita abaixo."
+                            : "Preencha as informações para adicionar uma nova receita."}
                     </DialogDescription>
                 </DialogHeader>
 
@@ -130,7 +157,9 @@ export function ModalReceita({ receita, usuarioId, onSave }: ModalReceitaProps) 
                                 id="descricao"
                                 placeholder="Ex: Venda de produto, Prestação de serviço..."
                                 value={formData.descricao}
-                                onChange={(e) => setFormData({ ...formData, descricao: e.target.value })}
+                                onChange={(e) =>
+                                    setFormData({ ...formData, descricao: e.target.value })
+                                }
                                 required
                             />
                         </div>
@@ -140,18 +169,26 @@ export function ModalReceita({ receita, usuarioId, onSave }: ModalReceitaProps) 
                                 <Label htmlFor="categoria">Categoria *</Label>
                                 <Select
                                     value={formData.categoria}
-                                    onValueChange={(value) => setFormData({ ...formData, categoria: value })}
+                                    onValueChange={(value) =>
+                                        setFormData({ ...formData, categoria: value })
+                                    }
                                     required
                                 >
                                     <SelectTrigger className="w-full">
                                         <SelectValue placeholder="Selecione..." />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="Vendas">Vendas</SelectItem>
-                                        <SelectItem value="Serviços">Serviços</SelectItem>
-                                        <SelectItem value="Comissões">Comissões</SelectItem>
-                                        <SelectItem value="Investimentos">Investimentos</SelectItem>
-                                        <SelectItem value="Outros">Outros</SelectItem>
+                                        <SelectItem value="Retirada de Sócio">
+                                            Retirada de Sócio
+                                        </SelectItem>
+                                        <SelectItem value="pix">Pix</SelectItem>
+                                        <SelectItem value="debito">Cartão de Débito</SelectItem>
+                                        <SelectItem value="credito">Cartão de Crédito</SelectItem>
+                                        <SelectItem value="boletos">Boletos</SelectItem>
+                                        <SelectItem value="dinheiro">Dinheiro</SelectItem>
+                                        <SelectItem value="cheque">Cheque</SelectItem>
+                                        <SelectItem value="transferencia">Transferência</SelectItem>
+                                        <SelectItem value="outros">Outros</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>
@@ -165,7 +202,9 @@ export function ModalReceita({ receita, usuarioId, onSave }: ModalReceitaProps) 
                                     min="0"
                                     placeholder="0,00"
                                     value={formData.valor}
-                                    onChange={(e) => setFormData({ ...formData, valor: e.target.value })}
+                                    onChange={(e) =>
+                                        setFormData({ ...formData, valor: e.target.value })
+                                    }
                                     required
                                 />
                             </div>
@@ -179,17 +218,26 @@ export function ModalReceita({ receita, usuarioId, onSave }: ModalReceitaProps) 
                                         <Button
                                             type="button"
                                             variant="outline"
-                                            className={cn("justify-start text-left font-normal", !formData.data && "text-muted-foreground")}
+                                            className={cn(
+                                                "justify-start text-left font-normal",
+                                                !formData.data && "text-muted-foreground"
+                                            )}
                                         >
                                             <CalendarIcon className="mr-2 h-4 w-4" />
-                                            {formData.data ? dayjs(formData.data).format("DD/MM/YYYY") : <span>Selecione a data</span>}
+                                            {formData.data ? (
+                                                dayjs(formData.data).format("DD/MM/YYYY")
+                                            ) : (
+                                                <span>Selecione a data</span>
+                                            )}
                                         </Button>
                                     </PopoverTrigger>
                                     <PopoverContent className="w-auto p-0">
                                         <Calendar
                                             mode="single"
                                             selected={formData.data}
-                                            onSelect={(date) => date && setFormData({ ...formData, data: date })}
+                                            onSelect={(date) =>
+                                                date && setFormData({ ...formData, data: date })
+                                            }
                                             initialFocus
                                         />
                                     </PopoverContent>
@@ -200,15 +248,17 @@ export function ModalReceita({ receita, usuarioId, onSave }: ModalReceitaProps) 
                                 <Label htmlFor="status">Status</Label>
                                 <Select
                                     value={formData.status}
-                                    onValueChange={(value) => setFormData({ ...formData, status: value as UiStatus })}
+                                    onValueChange={(value) =>
+                                        setFormData({ ...formData, status: value as status })
+                                    }
                                 >
                                     <SelectTrigger className="w-full">
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="Pendente">Pendente</SelectItem>
-                                        <SelectItem value="Recebido">Recebido</SelectItem>
-                                        <SelectItem value="Cancelado">Cancelado</SelectItem>
+                                        <SelectItem value="pendente">Pendente</SelectItem>
+                                        <SelectItem value="recebido">Recebido</SelectItem>
+                                        <SelectItem value="cancelado">Cancelado</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>
@@ -220,17 +270,28 @@ export function ModalReceita({ receita, usuarioId, onSave }: ModalReceitaProps) 
                                 id="observacoes"
                                 placeholder="Informações adicionais sobre a receita..."
                                 value={formData.observacoes}
-                                onChange={(e) => setFormData({ ...formData, observacoes: e.target.value })}
+                                onChange={(e) =>
+                                    setFormData({ ...formData, observacoes: e.target.value })
+                                }
                                 rows={3}
                             />
                         </div>
                     </div>
 
                     <DialogFooter className="pt-6">
-                        <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={submitting}>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setOpen(false)}
+                            disabled={submitting}
+                        >
                             Cancelar
                         </Button>
-                        <Button type="submit" className="bg-green-600 hover:bg-green-700 text-white" disabled={submitting}>
+                        <Button
+                            type="submit"
+                            className="bg-green-600 hover:bg-green-700 text-white"
+                            disabled={submitting}
+                        >
                             {isEditing ? "Salvar Alterações" : "Adicionar Receita"}
                         </Button>
                     </DialogFooter>

@@ -35,7 +35,7 @@ import { toast } from "sonner";
 interface ModalDespesaProps {
     despesa?: DespesaDados;
     usuarioId?: number;
-    onSave?: (r: DespesaDados) => void;
+    onSave?: (d: DespesaDados) => void;
 }
 
 export function ModalDespesa({ despesa, onSave, usuarioId }: ModalDespesaProps) {

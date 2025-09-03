@@ -8,8 +8,6 @@ import {
     type ReceitaSelect,
 } from "@/lib/validator/receitaValidator";
 import { readJson, readQuery, ok } from "@/lib/https";
-import { renderReceita, renderReceitas } from "@/lib/adapters/receita.adapter";
-
 export async function GET(req: NextRequest) {
     const { data: q, error } = readQuery(req, listReceitasQuerySchema);
     if (error || !q) return error!;
@@ -37,8 +35,10 @@ export async function GET(req: NextRequest) {
     ]);
 
     const total = Number(totalRow[0]?.count ?? 0);
-    const data = renderReceitas(rows as ReceitaSelect[]);
-    return NextResponse.json({ data, meta: { page: q.page, pageSize: q.pageSize, total } });
+    return NextResponse.json({
+        data: rows as ReceitaSelect[],
+        meta: { page: q.page, pageSize: q.pageSize, total },
+    });
 }
 
 export async function POST(req: NextRequest) {
@@ -53,5 +53,5 @@ export async function POST(req: NextRequest) {
         })
         .returning();
 
-    return ok(renderReceita(row as ReceitaSelect), { status: 201 });
+    return ok(row, { status: 201 });
 }
