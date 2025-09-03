@@ -172,10 +172,30 @@ export function ModalDespesa({ despesa, onSave, usuarioId }: ModalDespesaProps) 
                                         <SelectValue placeholder="Selecione..." />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="Vendas">Vendas</SelectItem>
-                                        <SelectItem value="Serviços">Serviços</SelectItem>
-                                        <SelectItem value="Comissões">Comissões</SelectItem>
-                                        <SelectItem value="Investimentos">Investimentos</SelectItem>
+                                        <SelectItem value="Retirada de Sócio">
+                                            Retirada de Sócio
+                                        </SelectItem>
+                                        <SelectItem value="Pix">Pix</SelectItem>
+                                        <SelectItem value="Fornecedores">Fornecedores</SelectItem>
+                                        <SelectItem value="Juros">Juros</SelectItem>
+                                        <SelectItem value="Impostos">Impostos</SelectItem>
+                                        <SelectItem value="Despesa Pessoal">
+                                            Despesa Pessoal
+                                        </SelectItem>
+                                        <SelectItem value="Saque">Saque</SelectItem>
+                                        <SelectItem value="Despesa Oficina">
+                                            Despesa Oficina
+                                        </SelectItem>
+                                        <SelectItem value="Contador">Contador</SelectItem>
+                                        <SelectItem value="Despesas com salario">
+                                            Despesas com salário
+                                        </SelectItem>
+                                        <SelectItem value="Despesa água/luz">
+                                            Despesa água/luz
+                                        </SelectItem>
+                                        <SelectItem value="Despesa internet/telefone">
+                                            Despesa internet/telefone
+                                        </SelectItem>
                                         <SelectItem value="Outros">Outros</SelectItem>
                                     </SelectContent>
                                 </Select>

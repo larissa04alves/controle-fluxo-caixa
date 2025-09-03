@@ -23,7 +23,7 @@ import { cn } from "@/lib/utils";
 import { ApiListResponse, ListMeta } from "@/lib/types/receitaPage.types";
 import { ReceitaDadosUI } from "@/lib/types/receitaModal.types";
 import { useCalcReceitas } from "./useCalcReceitas";
-import { useFilterDate } from "./useFilterDate";
+import { useFilterDate } from "../../lib/hooks/useFilterDate";
 import { toast } from "sonner";
 import { getDefaultMonthFilter } from "@/lib/utils/dateUtils";
 

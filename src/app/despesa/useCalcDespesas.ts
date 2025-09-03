@@ -6,9 +6,11 @@ import { useMemo, useEffect, useState } from "react";
 interface UseCalcDespesasProps {
     itens: DespesaDados[];
     meta: ListMeta;
+    dataInicial?: string;
+    dataFinal?: string;
 }
 
-export const useCalcDespesas = ({ itens, meta }: UseCalcDespesasProps) => {
+export const useCalcDespesas = ({ itens, meta, dataInicial, dataFinal }: UseCalcDespesasProps) => {
     const [todosDados, setTodosDados] = useState<DespesaDados[]>([]);
 
     // Função auxiliar para converter valor string para number
@@ -24,8 +26,8 @@ export const useCalcDespesas = ({ itens, meta }: UseCalcDespesasProps) => {
                 usuarioId: "1",
                 page: "1",
                 pageSize: "1000", // Buscar um número grande para pegar todos os dados
-                dataInicial: "2025-01-01",
-                dataFinal: "2025-12-31",
+                dataInicial: dataInicial || "2025-01-01",
+                dataFinal: dataFinal || "2025-12-31",
             });
 
             const res = await fetch(`/api/despesaApi?${params}`, { cache: "no-store" });

@@ -23,7 +23,8 @@ export async function readJson<T>(
     try {
         const body = await req.json();
         const parsed = schema.safeParse(body);
-        if (!parsed.success) return { error: badRequest("Invalid body", parsed.error.format()) };
+        if (!parsed.success)
+            return { error: badRequest("Dados incorretos, verifique", parsed.error.format()) };
         return { data: parsed.data };
     } catch {
         return { error: badRequest("Body must be valid JSON") };
@@ -35,6 +36,7 @@ export function readQuery<T>(
     schema: ZodSchema<T>
 ): { data?: T; error?: Response } {
     const parsed = schema.safeParse(Object.fromEntries(req.nextUrl.searchParams.entries()));
-    if (!parsed.success) return { error: badRequest("Invalid query", parsed.error.format()) };
+    if (!parsed.success)
+        return { error: badRequest("Dados incorretos, verifique", parsed.error.format()) };
     return { data: parsed.data };
 }

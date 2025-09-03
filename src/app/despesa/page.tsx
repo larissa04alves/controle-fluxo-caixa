@@ -21,8 +21,12 @@ import { ApiListResponse, ListMeta } from "@/lib/types/despesaPage.types";
 import { toast } from "sonner";
 import { useCalcDespesas } from "./useCalcDespesas";
 import { ModalDelete } from "@/components/deleteModal";
+import { useFilterDate } from "@/lib/hooks/useFilterDate";
+import { getDefaultMonthFilter } from "@/lib/utils/dateUtils";
 
 dayjs.locale("pt-br");
+
+const getCurrentMonth = getDefaultMonthFilter;
 
 const qs = (params: Record<string, string | number | undefined | null>) => {
     const search = new URLSearchParams();
@@ -37,6 +41,8 @@ const qs = (params: Record<string, string | number | undefined | null>) => {
 export default function DespesaPage() {
     const [filtroCategoria, setFiltroCategoria] = useState<string>("todas");
     const [filtroStatus, setFiltroStatus] = useState<string>("todos");
+    const [filtroMes, setFiltroMes] = useState<string>(getCurrentMonth());
+
     const [busca, setBusca] = useState<string>("");
     const [debouncedBusca, setDebouncedBusca] = useState<string>("");
 
@@ -47,6 +53,7 @@ export default function DespesaPage() {
     const [meta, setMeta] = useState<ListMeta>({ page: 1, pageSize: 10, total: 0 });
     const [loading, setLoading] = useState<boolean>(false);
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
+    const { dataInicial, dataFinal, MonthSelectComponent } = useFilterDate(filtroMes, setFiltroMes);
 
     useEffect(() => {
         const t = setTimeout(() => setDebouncedBusca(busca.trim()), 350);
@@ -64,8 +71,8 @@ export default function DespesaPage() {
                 categoria: filtroCategoria !== "todas" ? filtroCategoria : undefined,
                 status: filtroStatus !== "todos" ? filtroStatus : undefined,
                 texto: debouncedBusca || undefined,
-                dataInicial: "2025-01-01",
-                dataFinal: "2025-12-31",
+                dataInicial,
+                dataFinal,
             };
 
             const res = await fetch(`/api/despesaApi?${qs(params)}`, { cache: "no-store" });
@@ -87,7 +94,7 @@ export default function DespesaPage() {
     useEffect(() => {
         carregar();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [filtroCategoria, filtroStatus, debouncedBusca, page, pageSize]);
+    }, [filtroCategoria, filtroStatus, debouncedBusca, page, pageSize, dataInicial, dataFinal]);
 
     const handleSaved = () => {
         setPage(1);
@@ -98,6 +105,8 @@ export default function DespesaPage() {
         useCalcDespesas({
             itens,
             meta,
+            dataInicial,
+            dataFinal,
         });
 
     const handleDelete = async (id?: number) => {
@@ -232,10 +241,31 @@ export default function DespesaPage() {
                                     </SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="todas">Todas as categorias</SelectItem>
-                                        <SelectItem value="fixas">Fixas</SelectItem>
-                                        <SelectItem value="operacionais">Operacionais</SelectItem>
-                                        <SelectItem value="transporte">Transporte</SelectItem>
-                                        <SelectItem value="marketing">Marketing</SelectItem>
+                                        <SelectItem value="Retirada de Sócio">
+                                            Retirada de Sócio
+                                        </SelectItem>
+                                        <SelectItem value="Pix">Pix</SelectItem>
+                                        <SelectItem value="Fornecedores">Fornecedores</SelectItem>
+                                        <SelectItem value="Juros">Juros</SelectItem>
+                                        <SelectItem value="Impostos">Impostos</SelectItem>
+                                        <SelectItem value="Despesa Pessoal">
+                                            Despesa Pessoal
+                                        </SelectItem>
+                                        <SelectItem value="Saque">Saque</SelectItem>
+                                        <SelectItem value="Despesa Oficina">
+                                            Despesa Oficina
+                                        </SelectItem>
+                                        <SelectItem value="Contador">Contador</SelectItem>
+                                        <SelectItem value="Despesas com salario">
+                                            Despesas com salário
+                                        </SelectItem>
+                                        <SelectItem value="Despesa água/luz">
+                                            Despesa água/luz
+                                        </SelectItem>
+                                        <SelectItem value="Despesa internet/telefone">
+                                            Despesa internet/telefone
+                                        </SelectItem>
+                                        <SelectItem value="Outros">Outros</SelectItem>
                                     </SelectContent>
                                 </Select>
 
@@ -273,6 +303,12 @@ export default function DespesaPage() {
                                         <SelectItem value="50">50</SelectItem>
                                     </SelectContent>
                                 </Select>
+
+                                <MonthSelectComponent
+                                    filtroMes={filtroMes}
+                                    setFiltroMes={setFiltroMes}
+                                    setPage={setPage}
+                                />
                             </div>
                         </CardContent>
                     </Card>

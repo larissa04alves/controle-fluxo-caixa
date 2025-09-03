@@ -6,6 +6,8 @@ import { useMemo } from "react";
 interface UseCalcReceitasProps {
     itens: ReceitaDadosUI[];
     meta: ListMeta;
+    dataInicial?: string;
+    dataFinal?: string;
 }
 
 export const useCalcReceitas = ({ itens, meta }: UseCalcReceitasProps) => {
