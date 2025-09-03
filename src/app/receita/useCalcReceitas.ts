@@ -1,10 +1,10 @@
-import { ReceitaDados } from "@/lib/types/receitaModal.types";
+import { ReceitaDadosUI } from "@/lib/types/receitaModal.types";
 import { ListMeta } from "@/lib/types/receitaPage.types";
 import dayjs from "dayjs";
 import { useMemo } from "react";
 
 interface UseCalcReceitasProps {
-    itens: ReceitaDados[];
+    itens: ReceitaDadosUI[];
     meta: ListMeta;
 }
 

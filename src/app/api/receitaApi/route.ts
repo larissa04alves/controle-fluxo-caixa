@@ -2,12 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db/connection";
 import { receita } from "@/db/schema/receita";
 import { and, count, desc, eq, gte, ilike, lte, SQL } from "drizzle-orm";
-import {
-    createReceitaSchema,
-    listReceitasQuerySchema,
-    type ReceitaSelect,
-} from "@/lib/validator/receitaValidator";
+import { createReceitaSchema, listReceitasQuerySchema } from "@/lib/validator/receitaValidator";
 import { readJson, readQuery, ok } from "@/lib/https";
+import { renderReceitas } from "@/lib/adapters/receita.adapter";
 export async function GET(req: NextRequest) {
     const { data: q, error } = readQuery(req, listReceitasQuerySchema);
     if (error || !q) return error!;
@@ -36,7 +33,7 @@ export async function GET(req: NextRequest) {
 
     const total = Number(totalRow[0]?.count ?? 0);
     return NextResponse.json({
-        data: rows as ReceitaSelect[],
+        data: renderReceitas(rows),
         meta: { page: q.page, pageSize: q.pageSize, total },
     });
 }

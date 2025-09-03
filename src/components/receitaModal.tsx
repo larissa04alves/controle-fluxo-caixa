@@ -27,13 +27,13 @@ import dayjs from "dayjs";
 import "dayjs/locale/pt-br";
 import { cn } from "@/lib/utils";
 
-import { ApiResponse, isApiError, ReceitaDados, status } from "@/lib/types/receitaModal.types";
+import { ApiResponse, isApiError, ReceitaDadosUI, UiStatus } from "@/lib/types/receitaModal.types";
 import { toast } from "sonner";
 
 interface ModalReceitaProps {
-    receita?: ReceitaDados;
+    receita?: ReceitaDadosUI;
     usuarioId?: number;
-    onSave?: (r: ReceitaDados) => void;
+    onSave?: (r: ReceitaDadosUI) => void;
 }
 
 export function ModalReceita({ receita, usuarioId, onSave }: ModalReceitaProps) {
@@ -47,7 +47,7 @@ export function ModalReceita({ receita, usuarioId, onSave }: ModalReceitaProps) 
         categoria: receita?.categoria ?? "",
         valor: receita ? String(receita.valor) : "",
         data: new Date(receita?.data ?? new Date()),
-        status: (receita?.status ?? "pendente") as status,
+        status: (receita?.status ?? "Pendente") as UiStatus,
         observacoes: receita?.observacoes ?? "",
     });
 
@@ -60,12 +60,19 @@ export function ModalReceita({ receita, usuarioId, onSave }: ModalReceitaProps) 
         setSubmitting(true);
         try {
             let res: Response;
+
+            const statusMapping: Record<UiStatus, string> = {
+                Recebido: "pago",
+                Pendente: "pendente",
+                Cancelado: "cancelado",
+            };
+
             const payload = {
                 descricao: formData.descricao,
                 categoria: formData.categoria,
                 valor: parseFloat(formData.valor),
                 data: formData.data,
-                status: formData.status,
+                status: statusMapping[formData.status],
                 observacoes: formData.observacoes,
                 usuarioId: uid,
             };
@@ -83,7 +90,7 @@ export function ModalReceita({ receita, usuarioId, onSave }: ModalReceitaProps) 
                 });
             }
 
-            const json = (await res.json()) as ApiResponse<ReceitaDados>;
+            const json = (await res.json()) as ApiResponse<ReceitaDadosUI>;
 
             if (!res.ok || isApiError(json)) {
                 const message = isApiError(json) ? json.error : "Falha ao salvar a receita.";
@@ -110,7 +117,7 @@ export function ModalReceita({ receita, usuarioId, onSave }: ModalReceitaProps) 
                     categoria: "",
                     valor: "",
                     data: new Date(),
-                    status: "pendente",
+                    status: "Pendente",
                     observacoes: "",
                 });
             }
@@ -249,16 +256,16 @@ export function ModalReceita({ receita, usuarioId, onSave }: ModalReceitaProps) 
                                 <Select
                                     value={formData.status}
                                     onValueChange={(value) =>
-                                        setFormData({ ...formData, status: value as status })
+                                        setFormData({ ...formData, status: value as UiStatus })
                                     }
                                 >
                                     <SelectTrigger className="w-full">
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="pendente">Pendente</SelectItem>
-                                        <SelectItem value="recebido">Recebido</SelectItem>
-                                        <SelectItem value="cancelado">Cancelado</SelectItem>
+                                        <SelectItem value="Pendente">Pendente</SelectItem>
+                                        <SelectItem value="Recebido">Recebido</SelectItem>
+                                        <SelectItem value="Cancelado">Cancelado</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>

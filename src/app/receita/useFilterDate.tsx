@@ -6,6 +6,9 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
+import { getDefaultMonthFilter } from "@/lib/utils/dateUtils";
+
+export const getCurrentMonth = getDefaultMonthFilter;
 
 interface useFilterDateProps {
     filtroMes: string;
@@ -30,7 +33,6 @@ export const useFilterDate = (
     if (filtroMes !== "todos") {
         const mesNum = parseInt(filtroMes);
         dataInicial = `${currentYear}-${mesNum.toString().padStart(2, "0")}-01`;
-        // Último dia do mês
         const ultimoDia = new Date(currentYear, mesNum, 0).getDate();
         dataFinal = `${currentYear}-${mesNum.toString().padStart(2, "0")}-${ultimoDia}`;
     }

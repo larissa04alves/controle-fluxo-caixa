@@ -20,30 +20,22 @@ import { ModalReceita } from "@/components/receitaModal";
 import { ModalDelete } from "@/components/deleteModal";
 import { BarChart3, DollarSign, Search, TrendingUp } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { ApiListResponse, ListMeta, ReceitaDadosUi } from "@/lib/types/receitaPage.types";
-import { ReceitaDados, status } from "@/lib/types/receitaModal.types";
+import { ApiListResponse, ListMeta } from "@/lib/types/receitaPage.types";
+import { ReceitaDadosUI } from "@/lib/types/receitaModal.types";
 import { useCalcReceitas } from "./useCalcReceitas";
 import { useFilterDate } from "./useFilterDate";
 import { toast } from "sonner";
+import { getDefaultMonthFilter } from "@/lib/utils/dateUtils";
 
 dayjs.locale("pt-br");
 
-const uiToModalStatus: Record<string, status> = {
-    Recebido: "recebido",
+const getCurrentMonth = getDefaultMonthFilter;
+
+const uiToApiStatus: Record<string, string> = {
+    Recebido: "pago",
     Pendente: "pendente",
     Cancelado: "cancelado",
 };
-
-const convertUiToModal = (r: ReceitaDadosUi): ReceitaDados => ({
-    id: r.id,
-    descricao: r.descricao,
-    categoria: r.categoria,
-    valor: r.valor,
-    data: r.data,
-    status: uiToModalStatus[r.status] || "pendente",
-    observacoes: r.observacoes,
-    usuarioId: r.usuarioId,
-});
 
 const qs = (params: Record<string, string | number | undefined | null>) => {
     const search = new URLSearchParams();
@@ -58,14 +50,14 @@ const qs = (params: Record<string, string | number | undefined | null>) => {
 export default function ReceitaPage() {
     const [filtroCategoria, setFiltroCategoria] = useState<string>("todas");
     const [filtroStatus, setFiltroStatus] = useState<string>("todos");
-    const [filtroMes, setFiltroMes] = useState<string>("todos");
+    const [filtroMes, setFiltroMes] = useState<string>(getCurrentMonth());
     const [busca, setBusca] = useState<string>("");
     const [debouncedBusca, setDebouncedBusca] = useState<string>("");
 
     const [page, setPage] = useState<number>(1);
     const [pageSize, setPageSize] = useState<number>(10);
 
-    const [itens, setItens] = useState<ReceitaDadosUi[]>([]);
+    const [itens, setItens] = useState<ReceitaDadosUI[]>([]);
     const [meta, setMeta] = useState<ListMeta>({ page: 1, pageSize: 10, total: 0 });
     const [loading, setLoading] = useState<boolean>(false);
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -86,17 +78,19 @@ export default function ReceitaPage() {
                 page,
                 pageSize,
                 categoria: filtroCategoria !== "todas" ? filtroCategoria : undefined,
-                status: filtroStatus !== "todos" ? filtroStatus : undefined,
+                status:
+                    filtroStatus !== "todos"
+                        ? uiToApiStatus[filtroStatus] || filtroStatus
+                        : undefined,
                 texto: debouncedBusca || undefined,
                 dataInicial,
                 dataFinal,
             };
-
             const res = await fetch(`/api/receitaApi?${qs(params)}`, { cache: "no-store" });
             if (!res.ok) {
                 throw new Error(`Falha ao carregar receitas (${res.status})`);
             }
-            const json: ApiListResponse<ReceitaDadosUi> = await res.json();
+            const json: ApiListResponse<ReceitaDadosUI> = await res.json();
             setItens(json.data);
             setMeta(json.meta);
         } catch (error: unknown) {
@@ -119,7 +113,7 @@ export default function ReceitaPage() {
     };
 
     const { totalReceitas, receitasMes, mediaReceitas, totalPages } = useCalcReceitas({
-        itens: itens.map(convertUiToModal),
+        itens: itens,
         meta,
     });
 
@@ -382,7 +376,7 @@ export default function ReceitaPage() {
                                             </div>
                                             <div className="flex space-x-2">
                                                 <ModalReceita
-                                                    receita={convertUiToModal(r)}
+                                                    receita={r}
                                                     usuarioId={1}
                                                     onSave={handleSaved}
                                                 />
