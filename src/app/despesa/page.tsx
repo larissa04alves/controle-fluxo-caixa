@@ -1,5 +1,9 @@
 "use client";
 
+import React, { JSX, useCallback, useEffect, useMemo, useState } from "react";
+import dayjs from "dayjs";
+import "dayjs/locale/pt-br";
+
 import { Sidebar } from "@/components/sidebar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -14,37 +18,67 @@ import {
 } from "@/components/ui/select";
 import { BarChart3, DollarSign, Search, TrendingDown } from "lucide-react";
 import { ModalDespesa } from "@/components/despesaModal";
-import { useEffect, useState } from "react";
-import dayjs from "dayjs";
-import { DespesaDados } from "@/lib/types/despesaModal.types";
-import { ApiListResponse, ListMeta } from "@/lib/types/despesaPage.types";
-import { toast } from "sonner";
-import { useCalcDespesas } from "./useCalcDespesas";
 import { ModalDelete } from "@/components/deleteModal";
+import { toast } from "sonner";
+
+import type { DespesaDados } from "@/lib/types/despesaModal.types";
+import type { ApiListResponse, ListMeta } from "@/lib/types/despesaPage.types";
+import { useCalcDespesas } from "./useCalcDespesas";
 import { useFilterDate } from "@/lib/hooks/useFilterDate";
 import { getDefaultMonthFilter } from "@/lib/utils/dateUtils";
 
+// -----------------------------------------------------------------------------
 dayjs.locale("pt-br");
+const currencyBR = new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+    minimumFractionDigits: 2,
+});
 
-const getCurrentMonth = getDefaultMonthFilter;
+const CATEGORIES = [
+    { label: "Todas as categorias", value: "todas" },
+    { label: "Retirada de Sócio", value: "Retirada de Sócio" },
+    { label: "Pix", value: "Pix" },
+    { label: "Fornecedores", value: "Fornecedores" },
+    { label: "Juros", value: "Juros" },
+    { label: "Impostos", value: "Impostos" },
+    { label: "Despesa Pessoal", value: "Despesa Pessoal" },
+    { label: "Saque", value: "Saque" },
+    { label: "Despesa Oficina", value: "Despesa Oficina" },
+    { label: "Contador", value: "Contador" },
+    { label: "Despesas com salário", value: "Despesas com salario" },
+    { label: "Despesa água/luz", value: "Despesa água/luz" },
+    { label: "Despesa internet/telefone", value: "Despesa internet/telefone" },
+    { label: "Outros", value: "Outros" },
+] as const;
 
-const qs = (params: Record<string, string | number | undefined | null>) => {
+const STATUS = ["todos", "pago", "pendente", "cancelado"] as const;
+type StatusUI = (typeof STATUS)[number];
+
+function qs(params: Record<string, string | number | undefined | null>) {
     const search = new URLSearchParams();
-    Object.entries(params).forEach(([k, v]) => {
-        if (v !== undefined && v !== null && String(v).length > 0) {
-            search.set(k, String(v));
-        }
-    });
+    for (const [k, v] of Object.entries(params))
+        if (v !== undefined && v !== null && String(v).length) search.set(k, String(v));
     return search.toString();
-};
+}
 
-export default function DespesaPage() {
+function useDebounce<T>(value: T, delay = 350) {
+    const [debounced, setDebounced] = useState<T>(value);
+    useEffect(() => {
+        const t = setTimeout(() => setDebounced(value), delay);
+        return () => clearTimeout(t);
+    }, [value, delay]);
+    return debounced;
+}
+
+// -----------------------------------------------------------------------------
+export default function DespesaPage(): JSX.Element {
     const [filtroCategoria, setFiltroCategoria] = useState<string>("todas");
-    const [filtroStatus, setFiltroStatus] = useState<string>("todos");
-    const [filtroMes, setFiltroMes] = useState<string>(getCurrentMonth());
+    const [filtroStatus, setFiltroStatus] = useState<StatusUI>("todos");
+    const [filtroMes, setFiltroMes] = useState<string>(getDefaultMonthFilter());
 
     const [busca, setBusca] = useState<string>("");
-    const [debouncedBusca, setDebouncedBusca] = useState<string>("");
+    const debouncedBusca = useDebounce(busca.trim());
 
     const [page, setPage] = useState<number>(1);
     const [pageSize, setPageSize] = useState<number>(10);
@@ -53,53 +87,49 @@ export default function DespesaPage() {
     const [meta, setMeta] = useState<ListMeta>({ page: 1, pageSize: 10, total: 0 });
     const [loading, setLoading] = useState<boolean>(false);
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
     const { dataInicial, dataFinal, MonthSelectComponent } = useFilterDate(filtroMes, setFiltroMes);
 
-    useEffect(() => {
-        const t = setTimeout(() => setDebouncedBusca(busca.trim()), 350);
-        return () => clearTimeout(t);
-    }, [busca]);
+    const queryParams = useMemo(() => {
+        return {
+            usuarioId: 1,
+            page,
+            pageSize,
+            categoria: filtroCategoria !== "todas" ? filtroCategoria : undefined,
+            status: filtroStatus !== "todos" ? filtroStatus : undefined,
+            texto: debouncedBusca || undefined,
+            dataInicial,
+            dataFinal,
+        } satisfies Record<string, string | number | undefined | null>;
+    }, [page, pageSize, filtroCategoria, filtroStatus, debouncedBusca, dataInicial, dataFinal]);
 
-    const carregar = async () => {
+    const carregar = useCallback(async () => {
         setLoading(true);
         setErrorMsg(null);
         try {
-            const params = {
-                usuarioId: 1,
-                page,
-                pageSize,
-                categoria: filtroCategoria !== "todas" ? filtroCategoria : undefined,
-                status: filtroStatus !== "todos" ? filtroStatus : undefined,
-                texto: debouncedBusca || undefined,
-                dataInicial,
-                dataFinal,
-            };
-
-            const res = await fetch(`/api/despesaApi?${qs(params)}`, { cache: "no-store" });
-            if (!res.ok) {
-                throw new Error(`Falha ao carregar despesas (${res.status})`);
-            }
+            const res = await fetch(`/api/despesaApi?${qs(queryParams)}`, { cache: "no-store" });
+            if (!res.ok) throw new Error(`Falha ao carregar despesas (${res.status})`);
             const json: ApiListResponse<DespesaDados> = await res.json();
             setItens(json.data);
             setMeta(json.meta);
-        } catch (error: unknown) {
-            setErrorMsg((error as Error)?.message ?? "Erro ao carregar dados");
+        } catch (err) {
+            const msg = err instanceof Error ? err.message : "Erro ao carregar dados";
+            setErrorMsg(msg);
             setItens([]);
             setMeta((m) => ({ ...m, total: 0 }));
         } finally {
             setLoading(false);
         }
-    };
+    }, [queryParams]);
 
     useEffect(() => {
         carregar();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [filtroCategoria, filtroStatus, debouncedBusca, page, pageSize, dataInicial, dataFinal]);
+    }, [carregar]);
 
-    const handleSaved = () => {
+    const handleSaved = useCallback(() => {
         setPage(1);
         carregar();
-    };
+    }, [carregar]);
 
     const {
         despesasMes,
@@ -107,31 +137,36 @@ export default function DespesaPage() {
         categoriaComMaiorDespesa,
         totalPages,
         percentualMesAnterior,
-    } = useCalcDespesas({
-        itens,
-        meta,
-        dataInicial,
-        dataFinal,
-    });
+    } = useCalcDespesas({ itens, meta, dataInicial, dataFinal });
 
-    const handleDelete = async (id?: number) => {
-        try {
-            const res = await fetch(`/api/despesaApi/${id}`, { method: "DELETE" });
-            if (!res.ok) throw new Error("Não foi possível excluir.");
-            const restam = itens.length - 1;
-            if (restam <= 0 && page > 1) setPage((p) => p - 1);
-            else carregar();
+    const handleDelete = useCallback(
+        async (id?: number) => {
+            if (!id) return;
+            try {
+                const res = await fetch(`/api/despesaApi/${id}`, { method: "DELETE" });
+                if (!res.ok) throw new Error("Não foi possível excluir.");
 
-            toast.success("Despesa excluída com sucesso!", {
-                description: "A despesa foi removida do sistema.",
-            });
-        } catch (error: unknown) {
-            const message = (error as Error)?.message ?? "Erro ao excluir.";
-            toast.error("Erro ao excluir despesa", {
-                description: message,
-            });
-        }
-    };
+                setItens((prev) => prev.filter((x) => x.id !== id));
+                setMeta((prev) => ({ ...prev, total: Math.max(0, prev.total - 1) }));
+
+                setTimeout(() => {
+                    setItens((curr) => {
+                        if (curr.length === 0 && page > 1) setPage((p) => Math.max(1, p - 1));
+                        else carregar();
+                        return curr;
+                    });
+                }, 0);
+
+                toast.success("Despesa excluída com sucesso!", {
+                    description: "A despesa foi removida do sistema.",
+                });
+            } catch (error) {
+                const message = error instanceof Error ? error.message : "Erro ao excluir.";
+                toast.error("Erro ao excluir despesa", { description: message });
+            }
+        },
+        [carregar, page]
+    );
 
     return (
         <div className="flex h-screen bg-background">
@@ -149,6 +184,7 @@ export default function DespesaPage() {
                 </header>
 
                 <main className="p-6 space-y-6">
+                    {/* Cards resumo */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                         <Card className="bg-red-50 border-red-200">
                             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -159,10 +195,7 @@ export default function DespesaPage() {
                             </CardHeader>
                             <CardContent>
                                 <div className="text-2xl font-bold text-red-900">
-                                    R${" "}
-                                    {categoriaComMaiorDespesa.valor.toLocaleString("pt-BR", {
-                                        minimumFractionDigits: 2,
-                                    })}
+                                    {currencyBR.format(categoriaComMaiorDespesa.valor)}
                                 </div>
                                 <p className="text-xs text-red-600 mt-1">
                                     {categoriaComMaiorDespesa.categoria}
@@ -179,17 +212,17 @@ export default function DespesaPage() {
                             </CardHeader>
                             <CardContent>
                                 <div className="text-2xl font-bold text-orange-900">
-                                    R${" "}
-                                    {despesasMes.toLocaleString("pt-BR", {
-                                        minimumFractionDigits: 2,
-                                    })}
+                                    {currencyBR.format(despesasMes)}
                                 </div>
                                 <p className="text-xs text-orange-600 mt-1">
-                                    {percentualMesAnterior > 0
-                                        ? `+${percentualMesAnterior.toFixed(1)}% vs mês anterior`
-                                        : percentualMesAnterior < 0
-                                        ? `${percentualMesAnterior.toFixed(1)}% vs mês anterior`
-                                        : "Sem dados do mês anterior"}
+                                    {percentualMesAnterior !== 0 ? (
+                                        <>
+                                            {percentualMesAnterior > 0 ? "+" : ""}
+                                            {percentualMesAnterior.toFixed(1)}% vs mês anterior
+                                        </>
+                                    ) : (
+                                        "Referente ao mês atual"
+                                    )}
                                 </p>
                             </CardContent>
                         </Card>
@@ -203,10 +236,7 @@ export default function DespesaPage() {
                             </CardHeader>
                             <CardContent>
                                 <div className="text-2xl font-bold text-purple-900">
-                                    R${" "}
-                                    {mediaDespesas.toLocaleString("pt-BR", {
-                                        minimumFractionDigits: 2,
-                                    })}
+                                    {currencyBR.format(mediaDespesas)}
                                 </div>
                                 <p className="text-xs text-purple-600 mt-1">
                                     Valor médio por transação
@@ -215,6 +245,7 @@ export default function DespesaPage() {
                         </Card>
                     </div>
 
+                    {/* Filtros */}
                     <Card>
                         <CardHeader>
                             <CardTitle>Filtros</CardTitle>
@@ -227,84 +258,72 @@ export default function DespesaPage() {
                                         <Input
                                             placeholder="Buscar por despesas..."
                                             value={busca}
-                                            onChange={(e) => setBusca(e.target.value)}
+                                            onChange={(e) => {
+                                                setPage(1);
+                                                setBusca(e.target.value);
+                                            }}
                                             className="pl-10"
                                         />
                                     </div>
                                 </div>
+
                                 <Select
                                     value={filtroCategoria}
-                                    onValueChange={(v) => {
+                                    onValueChange={(value) => {
                                         setPage(1);
-                                        setFiltroCategoria(v);
+                                        setFiltroCategoria(value);
                                     }}
                                 >
                                     <SelectTrigger className="w-full md:w-48">
                                         <SelectValue placeholder="Categoria" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="todas">Todas as categorias</SelectItem>
-                                        <SelectItem value="Retirada de Sócio">
-                                            Retirada de Sócio
-                                        </SelectItem>
-                                        <SelectItem value="Pix">Pix</SelectItem>
-                                        <SelectItem value="Fornecedores">Fornecedores</SelectItem>
-                                        <SelectItem value="Juros">Juros</SelectItem>
-                                        <SelectItem value="Impostos">Impostos</SelectItem>
-                                        <SelectItem value="Despesa Pessoal">
-                                            Despesa Pessoal
-                                        </SelectItem>
-                                        <SelectItem value="Saque">Saque</SelectItem>
-                                        <SelectItem value="Despesa Oficina">
-                                            Despesa Oficina
-                                        </SelectItem>
-                                        <SelectItem value="Contador">Contador</SelectItem>
-                                        <SelectItem value="Despesas com salario">
-                                            Despesas com salário
-                                        </SelectItem>
-                                        <SelectItem value="Despesa água/luz">
-                                            Despesa água/luz
-                                        </SelectItem>
-                                        <SelectItem value="Despesa internet/telefone">
-                                            Despesa internet/telefone
-                                        </SelectItem>
-                                        <SelectItem value="Outros">Outros</SelectItem>
+                                        {CATEGORIES.map((categorie) => (
+                                            <SelectItem
+                                                key={categorie.value}
+                                                value={categorie.value}
+                                            >
+                                                {categorie.label}
+                                            </SelectItem>
+                                        ))}
                                     </SelectContent>
                                 </Select>
 
                                 <Select
                                     value={filtroStatus}
-                                    onValueChange={(v) => {
+                                    onValueChange={(value: StatusUI) => {
                                         setPage(1);
-                                        setFiltroStatus(v);
+                                        setFiltroStatus(value);
                                     }}
                                 >
                                     <SelectTrigger className="w-full md:w-48">
                                         <SelectValue placeholder="Status" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="todos">Todos</SelectItem>
-                                        <SelectItem value="pago">Pago</SelectItem>
-                                        <SelectItem value="pendente">Pendente</SelectItem>
-                                        <SelectItem value="cancelado">Cancelado</SelectItem>
+                                        {STATUS.map((status) => (
+                                            <SelectItem key={status} value={status}>
+                                                {status}
+                                            </SelectItem>
+                                        ))}
                                     </SelectContent>
                                 </Select>
 
                                 <Select
                                     value={String(pageSize)}
-                                    onValueChange={(v) => {
+                                    onValueChange={(value) => {
                                         setPage(1);
-                                        setPageSize(Number(v));
+                                        setPageSize(Number(value));
                                     }}
                                 >
                                     <SelectTrigger className="w-full md:w-40">
                                         <SelectValue placeholder="Itens por página" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="5">5</SelectItem>
-                                        <SelectItem value="10">10</SelectItem>
-                                        <SelectItem value="20">20</SelectItem>
-                                        <SelectItem value="50">50</SelectItem>
+                                        {[5, 10, 20, 50].map((number) => (
+                                            <SelectItem key={number} value={String(number)}>
+                                                {number}
+                                            </SelectItem>
+                                        ))}
                                     </SelectContent>
                                 </Select>
 
@@ -317,6 +336,7 @@ export default function DespesaPage() {
                         </CardContent>
                     </Card>
 
+                    {/* Lista */}
                     <Card>
                         <CardHeader>
                             <CardTitle>Lista de Despesas</CardTitle>
@@ -362,17 +382,15 @@ export default function DespesaPage() {
                                                 </div>
                                             </div>
                                         </div>
+
                                         <div className="flex items-center space-x-4">
                                             <div className="text-right">
                                                 <p className="font-semibold text-red-600">
-                                                    {(typeof despesa.valor === "string"
-                                                        ? parseFloat(despesa.valor)
-                                                        : despesa.valor
-                                                    ).toLocaleString("pt-BR", {
-                                                        style: "currency",
-                                                        currency: "BRL",
-                                                        minimumFractionDigits: 2,
-                                                    })}
+                                                    {currencyBR.format(
+                                                        typeof despesa.valor === "string"
+                                                            ? parseFloat(despesa.valor)
+                                                            : despesa.valor
+                                                    )}
                                                 </p>
                                                 <Badge
                                                     variant={
@@ -401,6 +419,7 @@ export default function DespesaPage() {
                                     </div>
                                 ))}
                             </div>
+
                             <div className="mt-6 flex items-center justify-between">
                                 <p className="text-sm text-muted-foreground">
                                     Página {meta.page} de {totalPages}

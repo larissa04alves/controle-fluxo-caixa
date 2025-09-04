@@ -1,7 +1,7 @@
-import { ListMeta } from "@/lib/types/despesaPage.types";
-import { DespesaDados } from "@/lib/types/despesaModal.types";
 import dayjs from "dayjs";
-import { useMemo, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import type { DespesaDados } from "@/lib/types/despesaModal.types";
+import type { ApiListResponse, ListMeta } from "@/lib/types/despesaPage.types";
 
 interface UseCalcDespesasProps {
     itens: DespesaDados[];
@@ -10,126 +10,129 @@ interface UseCalcDespesasProps {
     dataFinal?: string;
 }
 
-export const useCalcDespesas = ({ itens, meta, dataInicial, dataFinal }: UseCalcDespesasProps) => {
+// --- Helpers -----------------------------------------------------------------
+const parseValor = (v: number | string) => {
+    const n = typeof v === "string" ? parseFloat(v) : v;
+    return Number.isFinite(n) ? n : 0;
+};
+const sumBy = (arr: DespesaDados[], pick: (d: DespesaDados) => number) =>
+    arr.reduce((acc, d) => acc + pick(d), 0);
+
+/** Agrupa e soma por categoria */
+const groupSumByCategoria = (arr: DespesaDados[]) => {
+    const map: Record<string, number> = {};
+    for (const d of arr) map[d.categoria] = (map[d.categoria] ?? 0) + parseValor(d.valor);
+    return map;
+};
+
+/** Determina o mês de referência (início do mês) a partir do filtro ou do mês atual */
+const getMesRef = (dataInicial?: string) =>
+    dataInicial ? dayjs(dataInicial).startOf("month") : dayjs().startOf("month");
+
+// Busca paginada de todas as despesas do ano para cálculos comparativos
+async function fetchAllDespesasAno(usuarioId: number, ano: number): Promise<DespesaDados[]> {
+    const pageSize = 100;
+    let page = 1;
+    const acumulado: DespesaDados[] = [];
+
+    while (true) {
+        const params = new URLSearchParams({
+            usuarioId: String(usuarioId),
+            page: String(page),
+            pageSize: String(pageSize),
+            dataInicial: `${ano}-01-01`,
+            dataFinal: `${ano}-12-31`,
+        });
+
+        const res = await fetch(`/api/despesaApi?${params}`, { cache: "no-store" });
+        if (!res.ok) break;
+
+        const json: ApiListResponse<DespesaDados> = await res.json();
+        const lote = json.data ?? [];
+        acumulado.push(...lote);
+
+        if (lote.length < pageSize) break; // acabou
+        page += 1;
+    }
+
+    return acumulado;
+}
+
+// --- Hook --------------------------------------------------------------------
+export function useCalcDespesas({ itens, meta, dataInicial }: UseCalcDespesasProps) {
     const [todosDados, setTodosDados] = useState<DespesaDados[]>([]);
 
-    // Função auxiliar para converter valor string para number
-    const parseValor = (valor: number | string): number => {
-        const numValue = typeof valor === "string" ? parseFloat(valor) : valor;
-        return Number.isFinite(numValue) ? numValue : 0;
-    };
-
-    // Buscar todos os dados para cálculos corretos (sem filtros de data para permitir comparação com mês anterior)
-    const buscarTodosDados = async () => {
-        try {
-            const allData = [];
-            let page = 1;
-            const pageSize = 100;
-            const currentYear = new Date().getFullYear();
-
-            while (true) {
-                const params = new URLSearchParams({
-                    usuarioId: "1",
-                    page: page.toString(),
-                    pageSize: pageSize.toString(),
-                    dataInicial: `${currentYear}-01-01`,
-                    dataFinal: `${currentYear}-12-31`,
-                });
-
-                const res = await fetch(`/api/despesaApi?${params}`, { cache: "no-store" });
-                if (!res.ok) break;
-
-                const json = await res.json();
-                allData.push(...(json.data || []));
-
-                if ((json.data || []).length < pageSize) {
-                    break;
-                }
-
-                page++;
-            }
-
-            setTodosDados(allData);
-        } catch (error) {
-            console.error("Erro ao buscar dados para cálculo:", error);
-            setTodosDados(itens);
-        }
-    };
-
-    useEffect(() => {
-        buscarTodosDados();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [dataInicial, dataFinal]);
-
-    const dadosParaCalculo = todosDados.length > 0 ? todosDados : itens;
-
-    const totalDespesas = useMemo(
-        () => dadosParaCalculo.reduce((acc, d) => acc + parseValor(d.valor), 0),
-        [dadosParaCalculo]
+    // Ano alvo: usa o do filtro se houver
+    const anoRef = useMemo(
+        () => (dataInicial ? dayjs(dataInicial).year() : dayjs().year()),
+        [dataInicial]
     );
 
-    const despesasMes = useMemo(() => {
-        // Se temos filtro de data, usar o mês filtrado, senão usar o mês atual
-        const mesReferencia =
-            dataInicial && dataFinal
-                ? dayjs(dataInicial).startOf("month")
-                : dayjs().startOf("month");
+    const carregarTodosDados = useCallback(async () => {
+        try {
+            const all = await fetchAllDespesasAno(1, anoRef);
+            setTodosDados(all);
+        } catch {
+            setTodosDados(itens);
+        }
+    }, [anoRef, itens]);
 
-        return dadosParaCalculo
-            .filter((d) => dayjs(d.data).isSame(mesReferencia, "month"))
-            .reduce((acc, d) => acc + parseValor(d.valor), 0);
-    }, [dadosParaCalculo, dataInicial, dataFinal]);
+    useEffect(() => {
+        let active = true;
+        (async () => {
+            await carregarTodosDados();
+            if (!active) return;
+        })();
+        return () => {
+            active = false;
+        };
+    }, [carregarTodosDados]);
+
+    const base = todosDados.length > 0 ? todosDados : itens;
+
+    // --- Cálculos ---------------------------------------------------------------
+    const mesRef = useMemo(() => getMesRef(dataInicial), [dataInicial]);
+    const mesAnt = useMemo(() => mesRef.subtract(1, "month"), [mesRef]);
+
+    const totalDespesas = useMemo(() => sumBy(base, (d) => parseValor(d.valor)), [base]);
+
+    const despesasMes = useMemo(() => {
+        return sumBy(
+            base.filter((d) => dayjs(d.data).isSame(mesRef, "month")),
+            (d) => parseValor(d.valor)
+        );
+    }, [base, mesRef]);
 
     const despesasMesAnterior = useMemo(() => {
-        // Se temos filtro de data, usar o mês anterior ao filtrado, senão usar o mês anterior ao atual
-        const mesReferencia =
-            dataInicial && dataFinal
-                ? dayjs(dataInicial).startOf("month")
-                : dayjs().startOf("month");
-        const mesAnterior = mesReferencia.subtract(1, "month");
-
-        return dadosParaCalculo
-            .filter((d) => dayjs(d.data).isSame(mesAnterior, "month"))
-            .reduce((acc, d) => acc + parseValor(d.valor), 0);
-    }, [dadosParaCalculo, dataInicial, dataFinal]);
+        return sumBy(
+            base.filter((d) => dayjs(d.data).isSame(mesAnt, "month")),
+            (d) => parseValor(d.valor)
+        );
+    }, [base, mesAnt]);
 
     const percentualMesAnterior = useMemo(() => {
-        console.log("Debug - despesasMes:", despesasMes);
-        console.log("Debug - despesasMesAnterior:", despesasMesAnterior);
-        console.log("Debug - dataInicial:", dataInicial);
-        console.log("Debug - dataFinal:", dataFinal);
-
         if (despesasMesAnterior === 0) return 0;
         return ((despesasMes - despesasMesAnterior) / despesasMesAnterior) * 100;
-    }, [despesasMes, despesasMesAnterior, dataInicial, dataFinal]);
+    }, [despesasMes, despesasMesAnterior]);
 
     const mediaDespesas = useMemo(
-        () => (dadosParaCalculo.length ? totalDespesas / dadosParaCalculo.length : 0),
-        [dadosParaCalculo, totalDespesas]
+        () => (base.length ? totalDespesas / base.length : 0),
+        [base.length, totalDespesas]
     );
 
     const categoriaComMaiorDespesa = useMemo(() => {
-        if (dadosParaCalculo.length === 0) {
-            return { categoria: "Nenhuma", valor: 0 };
-        }
+        if (base.length === 0) return { categoria: "Nenhuma", valor: 0 } as const;
+        const byCat = groupSumByCategoria(base);
+        let winner: { categoria: string; valor: number } = { categoria: "", valor: 0 };
+        for (const [categoria, valor] of Object.entries(byCat))
+            if (valor > winner.valor) winner = { categoria, valor };
+        return winner;
+    }, [base]);
 
-        const categoriasMap = dadosParaCalculo.reduce((acc, despesa) => {
-            const valor = parseValor(despesa.valor);
-            acc[despesa.categoria] = (acc[despesa.categoria] || 0) + valor;
-            return acc;
-        }, {} as Record<string, number>);
-
-        const categoriaComMaiorValor = Object.entries(categoriasMap).reduce(
-            (maior, [categoria, valor]) => {
-                return valor > maior.valor ? { categoria, valor } : maior;
-            },
-            { categoria: "", valor: 0 }
-        );
-
-        return categoriaComMaiorValor;
-    }, [dadosParaCalculo]);
-
-    const totalPages = Math.max(1, Math.ceil(meta.total / meta.pageSize));
+    const totalPages = useMemo(
+        () => Math.max(1, Math.ceil(meta.total / meta.pageSize)),
+        [meta.total, meta.pageSize]
+    );
 
     return {
         totalDespesas,
@@ -138,5 +141,5 @@ export const useCalcDespesas = ({ itens, meta, dataInicial, dataFinal }: UseCalc
         categoriaComMaiorDespesa,
         totalPages,
         percentualMesAnterior,
-    };
-};
+    } as const;
+}
