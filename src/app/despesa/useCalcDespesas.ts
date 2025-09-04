@@ -19,25 +19,39 @@ export const useCalcDespesas = ({ itens, meta, dataInicial, dataFinal }: UseCalc
         return Number.isFinite(numValue) ? numValue : 0;
     };
 
-    // Buscar todos os dados para cálculos corretos (não paginados)
+    // Buscar todos os dados para cálculos corretos
     const buscarTodosDados = async () => {
         try {
-            const params = new URLSearchParams({
-                usuarioId: "1",
-                page: "1",
-                pageSize: "1000", // Buscar um número grande para pegar todos os dados
-                dataInicial: dataInicial || "2025-01-01",
-                dataFinal: dataFinal || "2025-12-31",
-            });
+            const allData = [];
+            let page = 1;
+            const pageSize = 100;
 
-            const res = await fetch(`/api/despesaApi?${params}`, { cache: "no-store" });
-            if (res.ok) {
+            while (true) {
+                const params = new URLSearchParams({
+                    usuarioId: "1",
+                    page: page.toString(),
+                    pageSize: pageSize.toString(),
+                    dataInicial: dataInicial || "2025-01-01",
+                    dataFinal: dataFinal || "2025-12-31",
+                });
+
+                const res = await fetch(`/api/despesaApi?${params}`, { cache: "no-store" });
+                if (!res.ok) break;
+
                 const json = await res.json();
-                setTodosDados(json.data || []);
+                allData.push(...(json.data || []));
+
+                if ((json.data || []).length < pageSize) {
+                    break;
+                }
+
+                page++;
             }
+
+            setTodosDados(allData);
         } catch (error) {
             console.error("Erro ao buscar dados para cálculo:", error);
-            setTodosDados(itens); // Fallback para os dados da página atual
+            setTodosDados(itens);
         }
     };
 
@@ -46,7 +60,6 @@ export const useCalcDespesas = ({ itens, meta, dataInicial, dataFinal }: UseCalc
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    // Usar todosDados para cálculos, itens apenas como fallback
     const dadosParaCalculo = todosDados.length > 0 ? todosDados : itens;
 
     const totalDespesas = useMemo(
@@ -78,7 +91,35 @@ export const useCalcDespesas = ({ itens, meta, dataInicial, dataFinal }: UseCalc
         [dadosParaCalculo, totalDespesas]
     );
 
+    const categoriaComMaiorDespesa = useMemo(() => {
+        if (dadosParaCalculo.length === 0) {
+            return { categoria: "Nenhuma", valor: 0 };
+        }
+
+        const categoriasMap = dadosParaCalculo.reduce((acc, despesa) => {
+            const valor = parseValor(despesa.valor);
+            acc[despesa.categoria] = (acc[despesa.categoria] || 0) + valor;
+            return acc;
+        }, {} as Record<string, number>);
+
+        const categoriaComMaiorValor = Object.entries(categoriasMap).reduce(
+            (maior, [categoria, valor]) => {
+                return valor > maior.valor ? { categoria, valor } : maior;
+            },
+            { categoria: "", valor: 0 }
+        );
+
+        return categoriaComMaiorValor;
+    }, [dadosParaCalculo]);
+
     const totalPages = Math.max(1, Math.ceil(meta.total / meta.pageSize));
 
-    return { totalDespesas, despesasMes, mediaDespesas, totalPages, percentualMesAnterior };
+    return {
+        totalDespesas,
+        despesasMes,
+        mediaDespesas,
+        categoriaComMaiorDespesa,
+        totalPages,
+        percentualMesAnterior,
+    };
 };

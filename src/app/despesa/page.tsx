@@ -101,13 +101,18 @@ export default function DespesaPage() {
         carregar();
     };
 
-    const { totalDespesas, despesasMes, mediaDespesas, totalPages, percentualMesAnterior } =
-        useCalcDespesas({
-            itens,
-            meta,
-            dataInicial,
-            dataFinal,
-        });
+    const {
+        despesasMes,
+        mediaDespesas,
+        categoriaComMaiorDespesa,
+        totalPages,
+        percentualMesAnterior,
+    } = useCalcDespesas({
+        itens,
+        meta,
+        dataInicial,
+        dataFinal,
+    });
 
     const handleDelete = async (id?: number) => {
         try {
@@ -148,18 +153,20 @@ export default function DespesaPage() {
                         <Card className="bg-red-50 border-red-200">
                             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                                 <CardTitle className="text-sm font-medium text-red-800">
-                                    Total de Despesas
+                                    Categoria com Maior Despesa
                                 </CardTitle>
                                 <DollarSign className="h-4 w-4 text-red-600" />
                             </CardHeader>
                             <CardContent>
                                 <div className="text-2xl font-bold text-red-900">
                                     R${" "}
-                                    {totalDespesas.toLocaleString("pt-BR", {
+                                    {categoriaComMaiorDespesa.valor.toLocaleString("pt-BR", {
                                         minimumFractionDigits: 2,
                                     })}
                                 </div>
-                                <p className="text-xs text-red-600 mt-1">Acumulado no período</p>
+                                <p className="text-xs text-red-600 mt-1">
+                                    {categoriaComMaiorDespesa.categoria}
+                                </p>
                             </CardContent>
                         </Card>
 
@@ -281,8 +288,9 @@ export default function DespesaPage() {
                                     </SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="todos">Todos</SelectItem>
-                                        <SelectItem value="Pago">Pago</SelectItem>
-                                        <SelectItem value="Pendente">Pendente</SelectItem>
+                                        <SelectItem value="pago">Pago</SelectItem>
+                                        <SelectItem value="pendente">Pendente</SelectItem>
+                                        <SelectItem value="cancelado">Cancelado</SelectItem>
                                     </SelectContent>
                                 </Select>
 
