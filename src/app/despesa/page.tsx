@@ -186,13 +186,9 @@ export default function DespesaPage() {
                                 </div>
                                 <p className="text-xs text-orange-600 mt-1">
                                     {percentualMesAnterior > 0
-                                        ? `+${percentualMesAnterior.toFixed(
-                                              1
-                                          )}% em relação ao mês anterior`
+                                        ? `+${percentualMesAnterior.toFixed(1)}% vs mês anterior`
                                         : percentualMesAnterior < 0
-                                        ? `${percentualMesAnterior.toFixed(
-                                              1
-                                          )}% em relação ao mês anterior`
+                                        ? `${percentualMesAnterior.toFixed(1)}% vs mês anterior`
                                         : "Sem dados do mês anterior"}
                                 </p>
                             </CardContent>

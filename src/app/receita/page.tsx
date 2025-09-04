@@ -112,9 +112,17 @@ export default function ReceitaPage() {
         carregar();
     };
 
-    const { receitasMes, mediaReceitas, categoriaComMaiorReceita, totalPages } = useCalcReceitas({
+    const {
+        receitasMes,
+        mediaReceitas,
+        categoriaComMaiorReceita,
+        totalPages,
+        percentualMesAnterior,
+    } = useCalcReceitas({
         itens: itens,
         meta,
+        dataInicial,
+        dataFinal,
     });
 
     const handleDelete = async (id: number) => {
@@ -191,7 +199,14 @@ export default function ReceitaPage() {
                                     })}
                                 </div>
                                 <p className="text-xs text-blue-600 mt-1">
-                                    Referente ao mês atual{" "}
+                                    {percentualMesAnterior !== 0 ? (
+                                        <>
+                                            {percentualMesAnterior > 0 ? "+" : ""}
+                                            {percentualMesAnterior.toFixed(1)}% vs mês anterior
+                                        </>
+                                    ) : (
+                                        "Referente ao mês atual"
+                                    )}
                                 </p>
                             </CardContent>
                         </Card>

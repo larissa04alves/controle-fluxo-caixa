@@ -19,20 +19,21 @@ export const useCalcDespesas = ({ itens, meta, dataInicial, dataFinal }: UseCalc
         return Number.isFinite(numValue) ? numValue : 0;
     };
 
-    // Buscar todos os dados para cálculos corretos
+    // Buscar todos os dados para cálculos corretos (sem filtros de data para permitir comparação com mês anterior)
     const buscarTodosDados = async () => {
         try {
             const allData = [];
             let page = 1;
             const pageSize = 100;
+            const currentYear = new Date().getFullYear();
 
             while (true) {
                 const params = new URLSearchParams({
                     usuarioId: "1",
                     page: page.toString(),
                     pageSize: pageSize.toString(),
-                    dataInicial: dataInicial || "2025-01-01",
-                    dataFinal: dataFinal || "2025-12-31",
+                    dataInicial: `${currentYear}-01-01`,
+                    dataFinal: `${currentYear}-12-31`,
                 });
 
                 const res = await fetch(`/api/despesaApi?${params}`, { cache: "no-store" });
@@ -58,7 +59,7 @@ export const useCalcDespesas = ({ itens, meta, dataInicial, dataFinal }: UseCalc
     useEffect(() => {
         buscarTodosDados();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+    }, [dataInicial, dataFinal]);
 
     const dadosParaCalculo = todosDados.length > 0 ? todosDados : itens;
 
@@ -68,23 +69,39 @@ export const useCalcDespesas = ({ itens, meta, dataInicial, dataFinal }: UseCalc
     );
 
     const despesasMes = useMemo(() => {
-        const agora = dayjs();
+        // Se temos filtro de data, usar o mês filtrado, senão usar o mês atual
+        const mesReferencia =
+            dataInicial && dataFinal
+                ? dayjs(dataInicial).startOf("month")
+                : dayjs().startOf("month");
+
         return dadosParaCalculo
-            .filter((d) => dayjs(d.data).isSame(agora, "month"))
+            .filter((d) => dayjs(d.data).isSame(mesReferencia, "month"))
             .reduce((acc, d) => acc + parseValor(d.valor), 0);
-    }, [dadosParaCalculo]);
+    }, [dadosParaCalculo, dataInicial, dataFinal]);
 
     const despesasMesAnterior = useMemo(() => {
-        const mesAnterior = dayjs().subtract(1, "month");
+        // Se temos filtro de data, usar o mês anterior ao filtrado, senão usar o mês anterior ao atual
+        const mesReferencia =
+            dataInicial && dataFinal
+                ? dayjs(dataInicial).startOf("month")
+                : dayjs().startOf("month");
+        const mesAnterior = mesReferencia.subtract(1, "month");
+
         return dadosParaCalculo
             .filter((d) => dayjs(d.data).isSame(mesAnterior, "month"))
             .reduce((acc, d) => acc + parseValor(d.valor), 0);
-    }, [dadosParaCalculo]);
+    }, [dadosParaCalculo, dataInicial, dataFinal]);
 
     const percentualMesAnterior = useMemo(() => {
+        console.log("Debug - despesasMes:", despesasMes);
+        console.log("Debug - despesasMesAnterior:", despesasMesAnterior);
+        console.log("Debug - dataInicial:", dataInicial);
+        console.log("Debug - dataFinal:", dataFinal);
+
         if (despesasMesAnterior === 0) return 0;
         return ((despesasMes - despesasMesAnterior) / despesasMesAnterior) * 100;
-    }, [despesasMes, despesasMesAnterior]);
+    }, [despesasMes, despesasMesAnterior, dataInicial, dataFinal]);
 
     const mediaDespesas = useMemo(
         () => (dadosParaCalculo.length ? totalDespesas / dadosParaCalculo.length : 0),
