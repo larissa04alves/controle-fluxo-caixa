@@ -1,30 +1,15 @@
-import { pgEnum, pgTable, serial, text, boolean } from "drizzle-orm/pg-core";
+import { pgTable, serial, varchar, numeric, date, text, integer } from "drizzle-orm/pg-core";
+import { user } from "./user";
 
-export const dreSideEnum = pgEnum("dre_side", ["receita", "despesa", "outros"]);
-export const dreLineEnum = pgEnum("dre_line", [
-    "receita_bruta",
-    "deducoes",
-    "receita_liquida",
-    "custo_produtos",
-    "despesa_vendas",
-    "despesa_administrativa",
-    "despesa_financeira",
-    "outras_receitas",
-    "outras_despesas",
-]);
-
-export const receitaAccount = pgTable("receita_account", {
+export const receita = pgTable("receita", {
     id: serial("id").primaryKey(),
-    code: text("code").notNull(),
-    name: text("name").notNull(),
-    line: dreLineEnum("line").notNull(),
-    side: dreSideEnum("side").notNull(),
-    isCogs: boolean("is_cogs").default(false),
-});
-
-export const receitaCategory = pgTable("receita_category", {
-    id: serial("id").primaryKey(),
-    category: text("category").notNull(),
-    side: dreSideEnum("side").notNull(),
-    accountCode: text("account_code").notNull(),
+    descricao: varchar("descricao", { length: 255 }).notNull(),
+    categoria: varchar("categoria", { length: 100 }).notNull(),
+    valor: numeric("valor", { precision: 12, scale: 2 }).notNull(),
+    data: date("data").notNull(),
+    status: varchar("status", { length: 50 }).notNull(),
+    observacoes: text("observacoes"),
+    usuarioId: integer("usuario_id")
+        .references(() => user.id, { onDelete: "cascade" })
+        .notNull(),
 });
