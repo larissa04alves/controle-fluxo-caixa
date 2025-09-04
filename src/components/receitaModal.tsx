@@ -33,7 +33,7 @@ import { toast } from "sonner";
 interface ModalReceitaProps {
     receita?: ReceitaDadosUI;
     usuarioId?: number;
-    onSave?: (r: ReceitaDadosUI) => void;
+    onSave?: (r?: ReceitaDadosUI) => void;
 }
 
 export function ModalReceita({ receita, usuarioId, onSave }: ModalReceitaProps) {

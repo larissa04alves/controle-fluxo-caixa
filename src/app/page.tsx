@@ -10,8 +10,18 @@ import { useUltimasAtividades } from "@/lib/hooks/useUltimasAtividades";
 import { useResumoFinanceiro } from "@/lib/hooks/useResumoFinanceiro";
 
 export default function HomePage() {
-    const { atividades, loading, error } = useUltimasAtividades();
-    const { resumo, loading: loadingResumo, error: errorResumo } = useResumoFinanceiro();
+    const { atividades, loading, error, refetch: refetchAtividades } = useUltimasAtividades();
+    const {
+        resumo,
+        loading: loadingResumo,
+        error: errorResumo,
+        refetch: refetchResumo,
+    } = useResumoFinanceiro();
+
+    const handleDataUpdate = () => {
+        refetchAtividades();
+        refetchResumo();
+    };
 
     return (
         <div className="flex h-screen bg-background">
@@ -27,8 +37,8 @@ export default function HomePage() {
                             </p>
                         </div>
                         <div className="flex space-x-2">
-                            <ModalReceita onSave={() => {}} />
-                            <ModalDespesa onSave={() => {}} />
+                            <ModalReceita onSave={handleDataUpdate} />
+                            <ModalDespesa onSave={handleDataUpdate} />
                         </div>
                     </div>
                 </header>
