@@ -1,7 +1,7 @@
-import { ReceitaDadosUI } from "@/lib/types/receitaModal.types";
-import { ListMeta } from "@/lib/types/receitaPage.types";
 import dayjs from "dayjs";
-import { useMemo, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import type { ReceitaDadosUI } from "@/lib/types/receitaModal.types";
+import type { ApiListResponse, ListMeta } from "@/lib/types/receitaPage.types";
 
 interface UseCalcReceitasProps {
     itens: ReceitaDadosUI[];
@@ -10,125 +10,129 @@ interface UseCalcReceitasProps {
     dataFinal?: string;
 }
 
-export const useCalcReceitas = ({ itens, meta, dataInicial, dataFinal }: UseCalcReceitasProps) => {
+// --- Helpers -----------------------------------------------------------------
+const parseValor = (v: number) => (Number.isFinite(v) ? v : 0);
+const sumBy = (arr: ReceitaDadosUI[], pick: (r: ReceitaDadosUI) => number) =>
+    arr.reduce((acc, r) => acc + pick(r), 0);
+
+/** Agrupa e soma por categoria */
+const groupSumByCategoria = (arr: ReceitaDadosUI[]) => {
+    const map: Record<string, number> = {};
+    for (const r of arr) map[r.categoria] = (map[r.categoria] ?? 0) + parseValor(r.valor);
+    return map;
+};
+
+/** Determina o mês de referência (início do mês) a partir do filtro ou do mês atual */
+const getMesRef = (dataInicial?: string) =>
+    dataInicial ? dayjs(dataInicial).startOf("month") : dayjs().startOf("month");
+
+// Busca paginada de todas as receitas do ano para cálculos comparativos
+async function fetchAllReceitasAno(usuarioId: number, ano: number): Promise<ReceitaDadosUI[]> {
+    const pageSize = 100;
+    let page = 1;
+    const acumulado: ReceitaDadosUI[] = [];
+
+    while (true) {
+        const params = new URLSearchParams({
+            usuarioId: String(usuarioId),
+            page: String(page),
+            pageSize: String(pageSize),
+            dataInicial: `${ano}-01-01`,
+            dataFinal: `${ano}-12-31`,
+        });
+
+        const res = await fetch(`/api/receitaApi?${params}`, { cache: "no-store" });
+        if (!res.ok) break;
+
+        const json: ApiListResponse<ReceitaDadosUI> = await res.json();
+        const lote = json.data ?? [];
+        acumulado.push(...lote);
+
+        if (lote.length < pageSize) break; // acabou
+        page += 1;
+    }
+
+    return acumulado;
+}
+
+// --- Hook --------------------------------------------------------------------
+export function useCalcReceitas({ itens, meta, dataInicial }: UseCalcReceitasProps) {
     const [todosDados, setTodosDados] = useState<ReceitaDadosUI[]>([]);
 
-    // Função auxiliar para converter valor para number
-    const parseValor = (valor: number): number => {
-        return Number.isFinite(valor) ? valor : 0;
-    };
-
-    // Buscar todos os dados para cálculos corretos (sem filtros de data para permitir comparação com mês anterior)
-    const buscarTodosDados = async () => {
-        try {
-            const allData = [];
-            let page = 1;
-            const pageSize = 100;
-            const currentYear = new Date().getFullYear();
-
-            while (true) {
-                const params = new URLSearchParams({
-                    usuarioId: "1",
-                    page: page.toString(),
-                    pageSize: pageSize.toString(),
-                    dataInicial: `${currentYear}-01-01`,
-                    dataFinal: `${currentYear}-12-31`,
-                });
-
-                const res = await fetch(`/api/receitaApi?${params}`, { cache: "no-store" });
-                if (!res.ok) break;
-
-                const json = await res.json();
-                allData.push(...(json.data || []));
-
-                if ((json.data || []).length < pageSize) {
-                    break;
-                }
-
-                page++;
-            }
-
-            setTodosDados(allData);
-        } catch (error) {
-            console.error("Erro ao buscar dados para cálculo:", error);
-            setTodosDados(itens);
-        }
-    };
-
-    useEffect(() => {
-        buscarTodosDados();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [dataInicial, dataFinal]);
-
-    const dadosParaCalculo = todosDados.length > 0 ? todosDados : itens;
-
-    const totalReceitas = useMemo(
-        () => dadosParaCalculo.reduce((acc, r) => acc + parseValor(r.valor), 0),
-        [dadosParaCalculo]
+    // Descobre o ano-alvo para comparação (usa o filtro se existir)
+    const anoRef = useMemo(
+        () => (dataInicial ? dayjs(dataInicial).year() : dayjs().year()),
+        [dataInicial]
     );
 
-    const receitasMes = useMemo(() => {
-        // Se temos filtro de data, usar o mês filtrado, senão usar o mês atual
-        const mesReferencia =
-            dataInicial && dataFinal
-                ? dayjs(dataInicial).startOf("month")
-                : dayjs().startOf("month");
+    // Carrega todas as receitas do ano (sem filtro de data) para permitir comparação com o mês anterior
+    const carregarTodosDados = useCallback(async () => {
+        try {
+            const all = await fetchAllReceitasAno(1, anoRef);
+            setTodosDados(all);
+        } catch (error) {
+            setTodosDados(itens);
+            console.error("Erro ao carregar todas as receitas do ano:", error);
+        }
+    }, [anoRef, itens]);
 
-        return dadosParaCalculo
-            .filter((r) => dayjs(r.data).isSame(mesReferencia, "month"))
-            .reduce((acc, r) => acc + parseValor(r.valor), 0);
-    }, [dadosParaCalculo, dataInicial, dataFinal]);
+    useEffect(() => {
+        let active = true;
+        (async () => {
+            await carregarTodosDados();
+            if (!active) return;
+        })();
+        return () => {
+            active = false;
+        };
+    }, [carregarTodosDados]);
+
+    // Usa todosDados se disponível; senão, cai para itens
+    const base = todosDados.length > 0 ? todosDados : itens;
+
+    // --- Cálculos ---------------------------------------------------------------
+    const mesRef = useMemo(() => getMesRef(dataInicial), [dataInicial]);
+    const mesAnt = useMemo(() => mesRef.subtract(1, "month"), [mesRef]);
+
+    const totalReceitas = useMemo(() => sumBy(base, (r) => parseValor(r.valor)), [base]);
+
+    const receitasMes = useMemo(() => {
+        return sumBy(
+            base.filter((r) => dayjs(r.data).isSame(mesRef, "month")),
+            (r) => parseValor(r.valor)
+        );
+    }, [base, mesRef]);
 
     const receitasMesAnterior = useMemo(() => {
-        // Se temos filtro de data, usar o mês anterior ao filtrado, senão usar o mês anterior ao atual
-        const mesReferencia =
-            dataInicial && dataFinal
-                ? dayjs(dataInicial).startOf("month")
-                : dayjs().startOf("month");
-        const mesAnterior = mesReferencia.subtract(1, "month");
-
-        return dadosParaCalculo
-            .filter((r) => dayjs(r.data).isSame(mesAnterior, "month"))
-            .reduce((acc, r) => acc + parseValor(r.valor), 0);
-    }, [dadosParaCalculo, dataInicial, dataFinal]);
+        return sumBy(
+            base.filter((r) => dayjs(r.data).isSame(mesAnt, "month")),
+            (r) => parseValor(r.valor)
+        );
+    }, [base, mesAnt]);
 
     const percentualMesAnterior = useMemo(() => {
-        console.log("Debug - receitasMes:", receitasMes);
-        console.log("Debug - receitasMesAnterior:", receitasMesAnterior);
-        console.log("Debug - dataInicial:", dataInicial);
-        console.log("Debug - dataFinal:", dataFinal);
-
         if (receitasMesAnterior === 0) return 0;
         return ((receitasMes - receitasMesAnterior) / receitasMesAnterior) * 100;
-    }, [receitasMes, receitasMesAnterior, dataInicial, dataFinal]);
+    }, [receitasMes, receitasMesAnterior]);
 
     const mediaReceitas = useMemo(
-        () => (dadosParaCalculo.length ? totalReceitas / dadosParaCalculo.length : 0),
-        [dadosParaCalculo, totalReceitas]
+        () => (base.length ? totalReceitas / base.length : 0),
+        [base.length, totalReceitas]
     );
 
     const categoriaComMaiorReceita = useMemo(() => {
-        if (dadosParaCalculo.length === 0) {
-            return { categoria: "Nenhuma", valor: 0 };
-        }
+        if (base.length === 0) return { categoria: "Nenhuma", valor: 0 } as const;
+        const byCat = groupSumByCategoria(base);
+        let winner: { categoria: string; valor: number } = { categoria: "", valor: 0 };
+        for (const [categoria, valor] of Object.entries(byCat))
+            if (valor > winner.valor) winner = { categoria, valor };
+        return winner;
+    }, [base]);
 
-        const categoriasMap = dadosParaCalculo.reduce((acc, receita) => {
-            const valor = parseValor(receita.valor);
-            acc[receita.categoria] = (acc[receita.categoria] || 0) + valor;
-            return acc;
-        }, {} as Record<string, number>);
-
-        const categoriaComMaiorValor = Object.entries(categoriasMap).reduce(
-            (maior, [categoria, valor]) => {
-                return valor > maior.valor ? { categoria, valor } : maior;
-            },
-            { categoria: "", valor: 0 }
-        );
-
-        return categoriaComMaiorValor;
-    }, [dadosParaCalculo]);
-
-    const totalPages = Math.max(1, Math.ceil(meta.total / meta.pageSize));
+    const totalPages = useMemo(
+        () => Math.max(1, Math.ceil(meta.total / meta.pageSize)),
+        [meta.total, meta.pageSize]
+    );
 
     return {
         totalReceitas,
@@ -137,5 +141,5 @@ export const useCalcReceitas = ({ itens, meta, dataInicial, dataFinal }: UseCalc
         categoriaComMaiorReceita,
         totalPages,
         percentualMesAnterior,
-    };
-};
+    } as const;
+}

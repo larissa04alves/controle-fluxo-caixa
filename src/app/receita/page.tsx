@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { JSX, useCallback, useEffect, useMemo, useState } from "react";
 import dayjs from "dayjs";
 import "dayjs/locale/pt-br";
 
@@ -20,8 +20,8 @@ import { ModalReceita } from "@/components/receitaModal";
 import { ModalDelete } from "@/components/deleteModal";
 import { BarChart3, DollarSign, Search, TrendingUp } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { ApiListResponse, ListMeta } from "@/lib/types/receitaPage.types";
-import { ReceitaDadosUI } from "@/lib/types/receitaModal.types";
+import type { ApiListResponse, ListMeta } from "@/lib/types/receitaPage.types";
+import type { ReceitaDadosUI } from "@/lib/types/receitaModal.types";
 import { useCalcReceitas } from "./useCalcReceitas";
 import { useFilterDate } from "../../lib/hooks/useFilterDate";
 import { toast } from "sonner";
@@ -29,30 +29,58 @@ import { getDefaultMonthFilter } from "@/lib/utils/dateUtils";
 
 dayjs.locale("pt-br");
 
-const getCurrentMonth = getDefaultMonthFilter;
+// --- Utils ------------------------------------------------------------------
+const currencyBR = new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+    minimumFractionDigits: 2,
+});
 
-const uiToApiStatus: Record<string, string> = {
+const CATEGORIES = [
+    { label: "Todas as categorias", value: "todas" },
+    { label: "Retirada de Sócio", value: "Retirada de Sócio" },
+    { label: "Pix", value: "pix" },
+    { label: "Cartão de Débito", value: "debito" },
+    { label: "Cartão de Crédito", value: "credito" },
+    { label: "Boletos", value: "boletos" },
+    { label: "Dinheiro", value: "dinheiro" },
+    { label: "Cheque", value: "cheque" },
+    { label: "Transferência", value: "transferencia" },
+    { label: "Outros", value: "outros" },
+] as const;
+
+type StatusUI = "todos" | "Recebido" | "Pendente" | "Cancelado";
+type StatusAPI = "pago" | "pendente" | "cancelado";
+
+const uiToApiStatus: Record<Exclude<StatusUI, "todos">, StatusAPI> = {
     Recebido: "pago",
     Pendente: "pendente",
     Cancelado: "cancelado",
 };
 
-const qs = (params: Record<string, string | number | undefined | null>) => {
+function qs(params: Record<string, string | number | undefined | null>) {
     const search = new URLSearchParams();
-    Object.entries(params).forEach(([k, v]) => {
-        if (v !== undefined && v !== null && String(v).length > 0) {
-            search.set(k, String(v));
-        }
-    });
+    for (const [k, v] of Object.entries(params))
+        if (v !== undefined && v !== null && String(v).length) search.set(k, String(v));
     return search.toString();
-};
+}
 
-export default function ReceitaPage() {
+function useDebounce<T>(value: T, delay = 350) {
+    const [debounced, setDebounced] = useState<T>(value);
+    useEffect(() => {
+        const t = setTimeout(() => setDebounced(value), delay);
+        return () => clearTimeout(t);
+    }, [value, delay]);
+    return debounced;
+}
+
+// --- Component ---------------------------------------------------------------
+export default function ReceitaPage(): JSX.Element {
     const [filtroCategoria, setFiltroCategoria] = useState<string>("todas");
-    const [filtroStatus, setFiltroStatus] = useState<string>("todos");
-    const [filtroMes, setFiltroMes] = useState<string>(getCurrentMonth());
+    const [filtroStatus, setFiltroStatus] = useState<StatusUI>("todos");
+    const [filtroMes, setFiltroMes] = useState<string>(getDefaultMonthFilter());
     const [busca, setBusca] = useState<string>("");
-    const [debouncedBusca, setDebouncedBusca] = useState<string>("");
+    const debouncedBusca = useDebounce(busca.trim());
 
     const [page, setPage] = useState<number>(1);
     const [pageSize, setPageSize] = useState<number>(10);
@@ -64,53 +92,46 @@ export default function ReceitaPage() {
 
     const { dataInicial, dataFinal, MonthSelectComponent } = useFilterDate(filtroMes, setFiltroMes);
 
-    useEffect(() => {
-        const t = setTimeout(() => setDebouncedBusca(busca.trim()), 350);
-        return () => clearTimeout(t);
-    }, [busca]);
+    const queryParams = useMemo(() => {
+        return {
+            usuarioId: 1,
+            page,
+            pageSize,
+            categoria: filtroCategoria !== "todas" ? filtroCategoria : undefined,
+            status: filtroStatus !== "todos" ? uiToApiStatus[filtroStatus] : undefined,
+            texto: debouncedBusca || undefined,
+            dataInicial,
+            dataFinal,
+        } satisfies Record<string, string | number | undefined | null>;
+    }, [page, pageSize, filtroCategoria, filtroStatus, debouncedBusca, dataInicial, dataFinal]);
 
-    const carregar = async () => {
+    const carregar = useCallback(async () => {
         setLoading(true);
         setErrorMsg(null);
         try {
-            const params = {
-                usuarioId: 1,
-                page,
-                pageSize,
-                categoria: filtroCategoria !== "todas" ? filtroCategoria : undefined,
-                status:
-                    filtroStatus !== "todos"
-                        ? uiToApiStatus[filtroStatus] || filtroStatus
-                        : undefined,
-                texto: debouncedBusca || undefined,
-                dataInicial,
-                dataFinal,
-            };
-            const res = await fetch(`/api/receitaApi?${qs(params)}`, { cache: "no-store" });
-            if (!res.ok) {
-                throw new Error(`Falha ao carregar receitas (${res.status})`);
-            }
+            const res = await fetch(`/api/receitaApi?${qs(queryParams)}`, { cache: "no-store" });
+            if (!res.ok) throw new Error(`Falha ao carregar receitas (${res.status})`);
             const json: ApiListResponse<ReceitaDadosUI> = await res.json();
             setItens(json.data);
             setMeta(json.meta);
-        } catch (error: unknown) {
-            setErrorMsg((error as Error)?.message ?? "Erro ao carregar dados");
+        } catch (err) {
+            const msg = err instanceof Error ? err.message : "Erro ao carregar dados";
+            setErrorMsg(msg);
             setItens([]);
             setMeta((m) => ({ ...m, total: 0 }));
         } finally {
             setLoading(false);
         }
-    };
+    }, [queryParams]);
 
     useEffect(() => {
         carregar();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [filtroCategoria, filtroStatus, filtroMes, debouncedBusca, page, pageSize]);
+    }, [carregar]);
 
-    const handleSaved = () => {
+    const handleSaved = useCallback(() => {
         setPage(1);
         carregar();
-    };
+    }, [carregar]);
 
     const {
         receitasMes,
@@ -118,31 +139,35 @@ export default function ReceitaPage() {
         categoriaComMaiorReceita,
         totalPages,
         percentualMesAnterior,
-    } = useCalcReceitas({
-        itens: itens,
-        meta,
-        dataInicial,
-        dataFinal,
-    });
+    } = useCalcReceitas({ itens, meta, dataInicial, dataFinal });
 
-    const handleDelete = async (id: number) => {
-        try {
-            const res = await fetch(`/api/receitaApi/${id}`, { method: "DELETE" });
-            if (!res.ok) throw new Error("Não foi possível excluir.");
-            const restam = itens.length - 1;
-            if (restam <= 0 && page > 1) setPage((p) => p - 1);
-            else carregar();
+    const handleDelete = useCallback(
+        async (id: number) => {
+            try {
+                const res = await fetch(`/api/receitaApi/${id}`, { method: "DELETE" });
+                if (!res.ok) throw new Error("Não foi possível excluir.");
 
-            toast.success("Receita excluída com sucesso!", {
-                description: "A receita foi removida do sistema.",
-            });
-        } catch (error: unknown) {
-            const message = (error as Error)?.message ?? "Erro ao excluir.";
-            toast.error("Erro ao excluir receita", {
-                description: message,
-            });
-        }
-    };
+                setItens((prev) => prev.filter((x) => x.id !== id));
+                setMeta((prev) => ({ ...prev, total: Math.max(0, prev.total - 1) }));
+
+                setTimeout(() => {
+                    setItens((curr) => {
+                        if (curr.length === 0 && page > 1) setPage((p) => Math.max(1, p - 1));
+                        else carregar();
+                        return curr;
+                    });
+                }, 0);
+
+                toast.success("Receita excluída com sucesso!", {
+                    description: "A receita foi removida do sistema.",
+                });
+            } catch (error) {
+                const message = error instanceof Error ? error.message : "Erro ao excluir.";
+                toast.error("Erro ao excluir receita", { description: message });
+            }
+        },
+        [carregar, page]
+    );
 
     return (
         <div className="flex h-screen bg-background">
@@ -160,6 +185,7 @@ export default function ReceitaPage() {
                 </header>
 
                 <main className="p-6 space-y-6">
+                    {/* Cards resumo */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                         <Card className="bg-green-50 border-green-200">
                             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -170,12 +196,7 @@ export default function ReceitaPage() {
                             </CardHeader>
                             <CardContent>
                                 <div className="text-2xl font-bold text-green-900">
-                                    {" "}
-                                    {categoriaComMaiorReceita.valor.toLocaleString("pt-BR", {
-                                        style: "currency",
-                                        currency: "BRL",
-                                        minimumFractionDigits: 2,
-                                    })}
+                                    {currencyBR.format(categoriaComMaiorReceita.valor)}
                                 </div>
                                 <p className="text-xs text-green-600 mt-1">
                                     {categoriaComMaiorReceita.categoria}
@@ -192,11 +213,7 @@ export default function ReceitaPage() {
                             </CardHeader>
                             <CardContent>
                                 <div className="text-2xl font-bold text-blue-900">
-                                    {receitasMes.toLocaleString("pt-BR", {
-                                        style: "currency",
-                                        currency: "BRL",
-                                        minimumFractionDigits: 2,
-                                    })}
+                                    {currencyBR.format(receitasMes)}
                                 </div>
                                 <p className="text-xs text-blue-600 mt-1">
                                     {percentualMesAnterior !== 0 ? (
@@ -220,17 +237,14 @@ export default function ReceitaPage() {
                             </CardHeader>
                             <CardContent>
                                 <div className="text-2xl font-bold text-purple-900">
-                                    {mediaReceitas.toLocaleString("pt-BR", {
-                                        style: "currency",
-                                        currency: "BRL",
-                                        minimumFractionDigits: 2,
-                                    })}
+                                    {currencyBR.format(mediaReceitas)}
                                 </div>
                                 <p className="text-xs text-purple-600 mt-1">Valor médio</p>
                             </CardContent>
                         </Card>
                     </div>
 
+                    {/* Filtros */}
                     <Card>
                         <CardHeader>
                             <CardTitle>Filtros</CardTitle>
@@ -254,65 +268,71 @@ export default function ReceitaPage() {
 
                                 <Select
                                     value={filtroCategoria}
-                                    onValueChange={(v) => {
+                                    onValueChange={(value) => {
                                         setPage(1);
-                                        setFiltroCategoria(v);
+                                        setFiltroCategoria(value);
                                     }}
                                 >
                                     <SelectTrigger className="w-full md:w-48">
                                         <SelectValue placeholder="Categoria" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="todas">Todas as categorias</SelectItem>
-                                        <SelectItem value="Retirada de Sócio">
-                                            Retirada de Sócio
-                                        </SelectItem>
-                                        <SelectItem value="pix">Pix</SelectItem>
-                                        <SelectItem value="debito">Cartão de Débito</SelectItem>
-                                        <SelectItem value="credito">Cartão de Crédito</SelectItem>
-                                        <SelectItem value="boletos">Boletos</SelectItem>
-                                        <SelectItem value="dinheiro">Dinheiro</SelectItem>
-                                        <SelectItem value="cheque">Cheque</SelectItem>
-                                        <SelectItem value="transferencia">Transferência</SelectItem>
-                                        <SelectItem value="outros">Outros</SelectItem>
+                                        {CATEGORIES.map((categories) => (
+                                            <SelectItem
+                                                key={categories.value}
+                                                value={categories.value}
+                                            >
+                                                {categories.label}
+                                            </SelectItem>
+                                        ))}
                                     </SelectContent>
                                 </Select>
 
                                 <Select
                                     value={filtroStatus}
-                                    onValueChange={(v) => {
+                                    onValueChange={(value: StatusUI) => {
                                         setPage(1);
-                                        setFiltroStatus(v);
+                                        setFiltroStatus(value);
                                     }}
                                 >
                                     <SelectTrigger className="w-full md:w-48">
                                         <SelectValue placeholder="Status" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="todos">Todos</SelectItem>
-                                        <SelectItem value="Recebido">Recebido</SelectItem>
-                                        <SelectItem value="Pendente">Pendente</SelectItem>
-                                        <SelectItem value="Cancelado">Cancelado</SelectItem>
+                                        {(
+                                            [
+                                                "todos",
+                                                "Recebido",
+                                                "Pendente",
+                                                "Cancelado",
+                                            ] as StatusUI[]
+                                        ).map((status) => (
+                                            <SelectItem key={status} value={status}>
+                                                {status}
+                                            </SelectItem>
+                                        ))}
                                     </SelectContent>
                                 </Select>
 
                                 <Select
                                     value={String(pageSize)}
-                                    onValueChange={(v) => {
+                                    onValueChange={(value) => {
                                         setPage(1);
-                                        setPageSize(Number(v));
+                                        setPageSize(Number(value));
                                     }}
                                 >
                                     <SelectTrigger className="w-full md:w-40">
                                         <SelectValue placeholder="Itens por página" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="5">5</SelectItem>
-                                        <SelectItem value="10">10</SelectItem>
-                                        <SelectItem value="20">20</SelectItem>
-                                        <SelectItem value="50">50</SelectItem>
+                                        {[5, 10, 20, 50].map((number) => (
+                                            <SelectItem key={number} value={String(number)}>
+                                                {number}
+                                            </SelectItem>
+                                        ))}
                                     </SelectContent>
                                 </Select>
+
                                 <MonthSelectComponent
                                     filtroMes={filtroMes}
                                     setFiltroMes={setFiltroMes}
@@ -345,9 +365,9 @@ export default function ReceitaPage() {
                                     </p>
                                 ) : null}
 
-                                {itens.map((r) => (
+                                {itens.map((receita) => (
                                     <div
-                                        key={r.id}
+                                        key={receita.id}
                                         className={cn(
                                             "flex items-center justify-between p-4 rounded-lg border border-border hover:bg-muted/50 transition-colors"
                                         )}
@@ -358,14 +378,14 @@ export default function ReceitaPage() {
                                             </div>
                                             <div>
                                                 <p className="font-medium text-foreground">
-                                                    {r.descricao}
+                                                    {receita.descricao}
                                                 </p>
                                                 <div className="flex items-center space-x-2 mt-1">
                                                     <Badge variant="outline" className="text-xs">
-                                                        {r.categoria}
+                                                        {receita.categoria}
                                                     </Badge>
                                                     <span className="text-sm text-muted-foreground">
-                                                        {dayjs(r.data).format("DD/MM/YYYY")}
+                                                        {dayjs(receita.data).format("DD/MM/YYYY")}
                                                     </span>
                                                 </div>
                                             </div>
@@ -374,33 +394,29 @@ export default function ReceitaPage() {
                                         <div className="flex items-center space-x-4">
                                             <div className="text-right">
                                                 <p className="font-semibold text-green-600">
-                                                    {r.valor.toLocaleString("pt-BR", {
-                                                        style: "currency",
-                                                        currency: "BRL",
-                                                        minimumFractionDigits: 2,
-                                                    })}
+                                                    {currencyBR.format(receita.valor)}
                                                 </p>
                                                 <Badge
                                                     variant={
-                                                        r.status === "Recebido"
+                                                        receita.status === "Recebido"
                                                             ? "default"
                                                             : "secondary"
                                                     }
                                                     className="text-xs"
                                                 >
-                                                    {r.status}
+                                                    {receita.status}
                                                 </Badge>
                                             </div>
                                             <div className="flex space-x-2">
                                                 <ModalReceita
-                                                    receita={r}
+                                                    receita={receita}
                                                     usuarioId={1}
                                                     onSave={handleSaved}
                                                 />
                                                 <ModalDelete
-                                                    itemName={r.descricao}
+                                                    itemName={receita.descricao}
                                                     itemType="receita"
-                                                    onConfirm={() => handleDelete(r.id)}
+                                                    onConfirm={() => handleDelete(receita.id)}
                                                 />
                                             </div>
                                         </div>
