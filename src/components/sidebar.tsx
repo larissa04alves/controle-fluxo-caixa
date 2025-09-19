@@ -1,6 +1,15 @@
 import { useState } from "react";
 import { Button } from "./ui/button";
-import { BarChart3, Home, Menu, Settings, TrendingDown, TrendingUp, X } from "lucide-react";
+import {
+    BarChart3,
+    Calendar,
+    Home,
+    Menu,
+    Settings,
+    TrendingDown,
+    TrendingUp,
+    X,
+} from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import Link from "next/link";
 
@@ -9,15 +18,14 @@ export const Sidebar = () => {
     const toggleSidebar = () => setSidebarOpen(!sidebarOpen);
     return (
         <div
-            className={`${sidebarOpen ? "w-64" : "w-16"
-                } transition-all duration-300 bg-sidebar border-r border-sidebar-border flex flex-col`}
+            className={`${
+                sidebarOpen ? "w-64" : "w-16"
+            } transition-all duration-300 bg-sidebar border-r border-sidebar-border flex flex-col`}
         >
             <div className="p-4 border-b border-sidebar-border">
                 <div className="flex items-center justify-between">
                     {sidebarOpen && (
-                        <h2 className="text-lg font-semibold text-sidebar-foreground">
-                            Flow Cash
-                        </h2>
+                        <h2 className="text-lg font-semibold text-sidebar-foreground">Flow Cash</h2>
                     )}
                     <Button
                         variant="ghost"
@@ -34,8 +42,9 @@ export const Sidebar = () => {
                     <Button
                         asChild
                         variant="ghost"
-                        className={`w-full ${sidebarOpen ? "justify-start" : "justify-center"
-                            } text-sidebar-foreground hover:bg-sidebar-accent`}
+                        className={`w-full ${
+                            sidebarOpen ? "justify-start" : "justify-center"
+                        } text-sidebar-foreground hover:bg-sidebar-accent`}
                     >
                         <Link href="/">
                             <Home className="h-4 w-4" />
@@ -45,8 +54,9 @@ export const Sidebar = () => {
                     <Button
                         asChild
                         variant="ghost"
-                        className={`w-full ${sidebarOpen ? "justify-start" : "justify-center"
-                            } text-sidebar-foreground hover:bg-sidebar-accent`}
+                        className={`w-full ${
+                            sidebarOpen ? "justify-start" : "justify-center"
+                        } text-sidebar-foreground hover:bg-sidebar-accent`}
                     >
                         <Link href="/receita">
                             <TrendingUp className="h-4 w-4" />
@@ -56,8 +66,9 @@ export const Sidebar = () => {
                     <Button
                         asChild
                         variant="ghost"
-                        className={`w-full ${sidebarOpen ? "justify-start" : "justify-center"
-                            } text-sidebar-foreground hover:bg-sidebar-accent`}
+                        className={`w-full ${
+                            sidebarOpen ? "justify-start" : "justify-center"
+                        } text-sidebar-foreground hover:bg-sidebar-accent`}
                     >
                         <Link href="/despesa">
                             <TrendingDown className="h-4 w-4" />
@@ -67,8 +78,9 @@ export const Sidebar = () => {
                     <Button
                         asChild
                         variant="ghost"
-                        className={`w-full ${sidebarOpen ? "justify-start" : "justify-center"
-                            } text-sidebar-foreground hover:bg-sidebar-accent`}
+                        className={`w-full ${
+                            sidebarOpen ? "justify-start" : "justify-center"
+                        } text-sidebar-foreground hover:bg-sidebar-accent`}
                     >
                         <Link href="/relatorio">
                             <BarChart3 className="h-4 w-4" />
@@ -78,12 +90,13 @@ export const Sidebar = () => {
                     <Button
                         asChild
                         variant="ghost"
-                        className={`w-full ${sidebarOpen ? "justify-start" : "justify-center"
-                            } text-sidebar-foreground hover:bg-sidebar-accent`}
+                        className={`w-full ${
+                            sidebarOpen ? "justify-start" : "justify-center"
+                        } text-sidebar-foreground hover:bg-sidebar-accent`}
                     >
-                        <Link href="/configuracao">
-                            <Settings className="h-4 w-4" />
-                            {sidebarOpen && <span className="ml-2">Configurações</span>}
+                        <Link href="/calendario">
+                            <Calendar className="h-4 w-4" />
+                            {sidebarOpen && <span className="ml-2">Calendário</span>}
                         </Link>
                     </Button>
                 </div>
@@ -110,5 +123,5 @@ export const Sidebar = () => {
                 </div>
             </div>
         </div>
-    )
-}
+    );
+};
