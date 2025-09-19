@@ -175,7 +175,7 @@ export default function ReceitaPage(): JSX.Element {
 
             <div className="flex-1 overflow-auto">
                 <header className="bg-card border-b border-border p-6">
-                    <div className="flex items-center justify-between">
+                    <div className="flex md:flex-row flex-col gap-2 md:gap-0 md:items-center justify-between">
                         <div>
                             <h1 className="text-2xl font-bold text-foreground">Receitas</h1>
                             <p className="text-muted-foreground">Gerencie todas as suas receitas</p>
@@ -353,7 +353,7 @@ export default function ReceitaPage(): JSX.Element {
                                           debouncedBusca ? ` para "${debouncedBusca}"` : ""
                                       }`}
                                 {errorMsg ? (
-                                    <span className="ml-2 text-destructive">— {errorMsg}</span>
+                                    <span className="ml-2 text-destructive">{errorMsg}</span>
                                 ) : null}
                             </CardDescription>
                         </CardHeader>
@@ -372,15 +372,15 @@ export default function ReceitaPage(): JSX.Element {
                                             "flex items-center justify-between p-4 rounded-lg border border-border hover:bg-muted/50 transition-colors"
                                         )}
                                     >
-                                        <div className="flex items-center space-x-4">
-                                            <div className="p-2 rounded-full bg-green-100 text-green-600">
+                                        <div className="flex md:flex-row flex-col items-center space-x-4">
+                                            <div className="p-2 md:flex hidden rounded-full bg-green-100 text-green-600">
                                                 <TrendingUp className="h-4 w-4" />
                                             </div>
                                             <div>
                                                 <p className="font-medium text-foreground">
                                                     {receita.descricao}
                                                 </p>
-                                                <div className="flex items-center space-x-2 mt-1">
+                                                <div className="flex md:flex-row flex-col items-start md:items-center space-x-2 mt-1">
                                                     <Badge variant="outline" className="text-xs">
                                                         {receita.categoria}
                                                     </Badge>
@@ -391,8 +391,8 @@ export default function ReceitaPage(): JSX.Element {
                                             </div>
                                         </div>
 
-                                        <div className="flex items-center space-x-4">
-                                            <div className="text-right">
+                                        <div className="flex md:flex-row flex-col items-center space-x-4">
+                                            <div className="text-right ">
                                                 <p className="font-semibold text-green-600">
                                                     {currencyBR.format(receita.valor)}
                                                 </p>
@@ -424,7 +424,7 @@ export default function ReceitaPage(): JSX.Element {
                                 ))}
                             </div>
 
-                            <div className="mt-6 flex items-center justify-between">
+                            <div className="mt-6 flex md:flex-row flex-col items-center justify-between">
                                 <p className="text-sm text-muted-foreground">
                                     Página {meta.page} de {totalPages}
                                 </p>

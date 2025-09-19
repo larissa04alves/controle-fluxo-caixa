@@ -139,7 +139,7 @@ export function ModalReceita({ receita, usuarioId, onSave }: ModalReceitaProps) 
                         <Edit className="h-4 w-4" />
                     </Button>
                 ) : (
-                    <Button className="bg-green-600 hover:bg-green-700 text-white">
+                    <Button className="bg-green-600 hover:bg-green-700 w-1/2 md:w-auto text-white">
                         <Plus className="h-4 w-4 mr-2" />
                         Nova Receita
                     </Button>
